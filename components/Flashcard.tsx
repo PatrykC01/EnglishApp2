@@ -5,15 +5,19 @@ interface FlashcardProps {
   word: Word;
   onResult: (correct: boolean) => void;
   imageUrl?: string;
+  onRegenerateImage?: () => void;
 }
 
-const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl }) => {
+const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegenerateImage }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [dragX, setDragX] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
   
   // Touch/Mouse handlers for simple swipe logic
   const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
+    // Only drag if not clicking a button inside the card
+    if ((e.target as HTMLElement).closest('button')) return;
+
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const startX = clientX;
 
@@ -85,7 +89,7 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl }) => {
         {/* Back */}
         <div className="absolute w-full h-full backface-hidden rotate-y-180 flex flex-col rounded-3xl bg-white overflow-hidden shadow-inner">
           {/* Image Section - Takes up 55% of height */}
-          <div className="h-[55%] w-full bg-slate-100 relative">
+          <div className="h-[55%] w-full bg-slate-100 relative group">
              {imageUrl ? (
                 <img 
                     src={imageUrl} 
@@ -97,6 +101,18 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl }) => {
                     <span className="text-4xl">🖼️</span>
                 </div>
              )}
+             
+             {/* Regenerate Button - Visible on Hover or if clicked */}
+             {onRegenerateImage && (
+                 <button 
+                    onClick={(e) => { e.stopPropagation(); onRegenerateImage(); }}
+                    className="absolute top-4 right-4 bg-white/80 p-2 rounded-full shadow-md hover:bg-white transition-all text-slate-600 hover:text-indigo-600"
+                    title="Odśwież obrazek"
+                 >
+                     🔄
+                 </button>
+             )}
+
              {/* Gradient overlay for text readability transition */}
              <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white to-transparent"></div>
           </div>

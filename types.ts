@@ -41,6 +41,7 @@ export interface Settings {
   dailyGoal: number;
   level: LanguageLevel;
   aiProvider: 'gemini' | 'free';
+  aiModelType: 'flash' | 'pro'; // New setting
   huggingFaceApiKey: string;
   enableTTS: boolean;
   enableSoundEffects: boolean;

@@ -129,13 +129,19 @@ export const geminiService = {
   },
 
   /**
-   * Generates an image for a word.
+   * Generates an image for a word based on its context/sentence.
    * Priority: Gemini -> Hugging Face (via Proxy) -> Pollinations.ai (Fallback)
    */
-  generateImage: async (word: string, context: string): Promise<string> => {
+  generateImage: async (word: string, contextOrSentence?: string): Promise<string> => {
     const settings = storageService.getSettings();
     const apiKey = process.env.API_KEY;
     
+    // Construct the prompt. If a sentence is provided, use it to create a scene.
+    // If only the word is provided, fallback to a simple icon.
+    const promptText = contextOrSentence 
+        ? `A clean, minimalist, vector-style illustration depicting the following scene: "${contextOrSentence}". Focus on the concept of "${word}". White background, flat design, no text.`
+        : `A simple, minimalist, vector-style illustration of "${word}". White background. No text.`;
+
     // 1. Attempt Gemini Image Gen (if API key exists)
     if (apiKey && settings.aiProvider === 'gemini') {
       try {
@@ -146,7 +152,7 @@ export const geminiService = {
 
         const response = await ai.models.generateContent({
           model: modelName,
-          contents: `A simple, minimalist, vector-style illustration of "${word}". Context: ${context}. White background. No text.`,
+          contents: promptText,
           config: {}
         });
 
@@ -171,8 +177,7 @@ export const geminiService = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    // Optimized prompt for SDXL
-                    prompt: `icon, vector art, flat design, minimal illustration of ${word}, ${context}, white background, high quality, simple shapes`,
+                    prompt: promptText + ", high quality, 4k, vector art",
                     apiKey: settings.huggingFaceApiKey
                 })
             });
@@ -191,7 +196,12 @@ export const geminiService = {
 
     // 3. Fallback: Pollinations.ai (Free, no key)
     console.log("Using Pollinations.ai fallback...");
-    const encodedPrompt = encodeURIComponent(`minimalist vector illustration of ${word}, ${context}, white background, flat design, icon style, clear lines`);
+    // Simplify prompt for URL length safety and style consistency
+    const simplePrompt = contextOrSentence 
+        ? `illustration of ${word} scene ${contextOrSentence} vector flat white background`
+        : `vector illustration of ${word} white background flat design`;
+        
+    const encodedPrompt = encodeURIComponent(simplePrompt.slice(0, 300)); // Safety limit
     const seed = Math.floor(Math.random() * 1000); 
     return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&seed=${seed}`;
   },

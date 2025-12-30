@@ -84,21 +84,16 @@ export const geminiService = {
 
   /**
    * Generates an image for a word.
-   * Tries Gemini first, then falls back to Pollinations.ai (Free, unlimited).
+   * Priority: Gemini -> Hugging Face (via Proxy) -> Pollinations.ai (Fallback)
    */
   generateImage: async (word: string, context: string): Promise<string> => {
     const settings = storageService.getSettings();
     const apiKey = process.env.API_KEY;
     
-    // 1. Attempt Gemini Image Gen
-    // Only if API key exists.
-    if (apiKey) {
+    // 1. Attempt Gemini Image Gen (if API key exists)
+    if (apiKey && settings.aiProvider === 'gemini') {
       try {
         const ai = new GoogleGenAI({ apiKey });
-        
-        // Select model based on settings
-        // General Image: 'gemini-2.5-flash-image'
-        // High-Quality Image: 'gemini-3-pro-image-preview'
         const modelName = settings.aiModelType === 'pro'
             ? 'gemini-3-pro-image-preview'
             : 'gemini-2.5-flash-image';
@@ -106,12 +101,9 @@ export const geminiService = {
         const response = await ai.models.generateContent({
           model: modelName,
           contents: `A simple, minimalist, vector-style illustration of "${word}". Context: ${context}. White background. No text.`,
-          config: {
-            // responseMimeType is not supported for nano banana series models
-          }
+          config: {}
         });
 
-        // Parse parts for image
         const parts = response.candidates?.[0]?.content?.parts;
         if (parts) {
             for (const part of parts) {
@@ -121,16 +113,37 @@ export const geminiService = {
             }
         }
       } catch (e: any) {
-        console.warn("Gemini image generation failed (Quota or Error). Switching to fallback.", e.message);
-        // We continue to fallback if Gemini fails (e.g., 429 Quota Exceeded)
+        console.warn("Gemini image generation failed. Trying next provider.", e.message);
       }
     }
 
-    // 2. Fallback: Pollinations.ai
-    // Great free alternative that works via URL, no API key needed, no CORS issues for images.
+    // 2. Attempt Hugging Face (via Vercel Proxy)
+    if (settings.huggingFaceApiKey) {
+        try {
+            console.log("Attempting Hugging Face (Stable Diffusion) via Proxy...");
+            const response = await fetch('/api/generate-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    prompt: `minimalist vector illustration of ${word}, ${context}, white background, flat design, icon style`,
+                    apiKey: settings.huggingFaceApiKey
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.image) return data.image;
+            } else {
+                console.warn("HF Proxy returned error:", await response.text());
+            }
+        } catch (e) {
+            console.warn("HF Proxy failed (Are you running locally without 'vercel dev'?).", e);
+        }
+    }
+
+    // 3. Fallback: Pollinations.ai (Free, no key)
     console.log("Using Pollinations.ai fallback...");
     const encodedPrompt = encodeURIComponent(`minimalist vector illustration of ${word}, ${context}, white background, flat design, icon style, clear lines`);
-    // Random seed to prevent browser caching if generated multiple times
     const seed = Math.floor(Math.random() * 1000); 
     return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&seed=${seed}`;
   },
@@ -143,19 +156,10 @@ export const geminiService = {
      
      // Fallback function for basic string check
      const basicCheck = () => {
-         const cleanInput = userEnglishInput.trim().toLowerCase();
-         // Usually we would need the original English word here, but checkTranslation assumes 
-         // we are checking against logic. 
-         // Ideally, the caller should probably handle strict check if AI fails, 
-         // but here we will try our best or return a neutral "offline" state.
-         
-         // Since we don't pass the "Correct English" word to this function (only Polish and User Input),
-         // we can't do a perfect fallback unless we change the signature.
-         // However, in TypingMode, we know the correct english word.
-         // Let's modify this to be robust even if AI fails.
+         // This is a last resort fallback
          return {
-             isCorrect: false, // We can't know for sure without the target word
-             feedback: "AI niedostępne (Limit). Sprawdź dokładnie pisownię."
+             isCorrect: false, 
+             feedback: "AI_ERROR" 
          };
      };
 
@@ -189,8 +193,6 @@ export const geminiService = {
         }
      } catch (e) {
          console.warn("AI Self-Check failed (likely 429).", e);
-         // Return a specific flag so the UI can do a simple string match instead
-         // We return 'true' here but with a special feedback to let the UI know to fallback
          return { isCorrect: false, feedback: "AI_ERROR" };
      }
      

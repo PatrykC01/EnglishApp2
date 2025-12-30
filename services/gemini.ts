@@ -113,19 +113,20 @@ export const geminiService = {
             }
         }
       } catch (e: any) {
-        console.warn("Gemini image generation failed. Trying next provider.", e.message);
+        console.warn("Gemini image generation failed (likely quota). Trying next provider.");
       }
     }
 
     // 2. Attempt Hugging Face (via Vercel Proxy)
     if (settings.huggingFaceApiKey) {
         try {
-            console.log("Attempting Hugging Face (Stable Diffusion) via Proxy...");
+            console.log("Attempting Hugging Face (SDXL) via Proxy...");
             const response = await fetch('/api/generate-image', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    prompt: `minimalist vector illustration of ${word}, ${context}, white background, flat design, icon style`,
+                    // Optimized prompt for SDXL
+                    prompt: `icon, vector art, flat design, minimal illustration of ${word}, ${context}, white background, high quality, simple shapes`,
                     apiKey: settings.huggingFaceApiKey
                 })
             });
@@ -134,10 +135,12 @@ export const geminiService = {
                 const data = await response.json();
                 if (data.image) return data.image;
             } else {
-                console.warn("HF Proxy returned error:", await response.text());
+                // If proxy returns 4xx/5xx, we log it but don't crash, allowing fallback
+                const errText = await response.text();
+                console.warn("HF Proxy returned error (Switching to Fallback):", errText);
             }
         } catch (e) {
-            console.warn("HF Proxy failed (Are you running locally without 'vercel dev'?).", e);
+            console.warn("HF Proxy failed (Are you running locally without 'vercel dev'?). Switching to Fallback.", e);
         }
     }
 

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Word, StudyMode } from '../types';
 import Flashcard from '../components/Flashcard';
@@ -38,7 +39,8 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
 
   // Load image when word changes (only for non-grid modes)
   useEffect(() => {
-    if (currentWord && (mode === StudyMode.Flashcards || mode === StudyMode.Typing || mode === StudyMode.Listening)) {
+    // Fix: Updated StudyMode keys to lowercase to match types.ts definition
+    if (currentWord && (mode === StudyMode.flashcards || mode === StudyMode.typing || mode === StudyMode.listening)) {
         setCurrentImage(undefined);
         
         if (currentWord.imageUrl) {
@@ -73,7 +75,8 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
 
   // Initialize Match Mode
   useEffect(() => {
-    if (mode === StudyMode.Match && words.length > 0) {
+    // Fix: Updated StudyMode.Match to StudyMode.match
+    if (mode === StudyMode.match && words.length > 0) {
         const cards: MatchCard[] = [];
         words.forEach(w => {
             cards.push({ id: `pl-${w.id}`, wordId: w.id, text: w.polish, state: 'default' });
@@ -170,7 +173,8 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
 
   // --- RENDERERS ---
 
-  if (mode === StudyMode.Flashcards) {
+  // Fix: Updated StudyMode.Flashcards to StudyMode.flashcards
+  if (mode === StudyMode.flashcards) {
     return (
       <div className="flex flex-col items-center h-full justify-center">
         <div className="w-full flex justify-between items-center mb-6 px-4">
@@ -188,7 +192,8 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
     );
   }
 
-  if (mode === StudyMode.Typing) {
+  // Fix: Updated StudyMode.Typing to StudyMode.typing
+  if (mode === StudyMode.typing) {
     const checkTyping = async () => {
         setTypingFeedback('neutral');
         setTypingMessage('Sprawdzanie...');
@@ -276,7 +281,8 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
     );
   }
 
-  if (mode === StudyMode.Listening) {
+  // Fix: Updated StudyMode.Listening to StudyMode.listening
+  if (mode === StudyMode.listening) {
     return (
         <div className="flex flex-col items-center h-full justify-center max-w-md mx-auto px-4">
             <div className="text-center mb-8">
@@ -318,7 +324,8 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
     );
   }
 
-  if (mode === StudyMode.Match) {
+  // Fix: Updated StudyMode.Match to StudyMode.match
+  if (mode === StudyMode.match) {
       return (
           <div className="flex flex-col items-center h-full pt-4 md:pt-10 px-2">
               <div className="w-full max-w-3xl flex justify-between items-center mb-6 px-2">

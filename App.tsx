@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Layout from './components/Layout';
 import StudySession from './views/StudySession';
 import AddWordModal from './components/AddWordModal';
@@ -20,6 +20,9 @@ const App: React.FC = () => {
   // Generation & Modal State
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  
+  // Word List Filter State
+  const [listFilter, setListFilter] = useState<StudySource>(StudySource.All);
 
   useEffect(() => {
     const loadedWords = storageService.getWords();
@@ -38,16 +41,19 @@ const App: React.FC = () => {
     storageService.saveStats(newStats);
   };
 
+  // Logic to filter words based on settings
+  const getEligibleWords = useMemo(() => {
+    if (settings.preferredStudySource === StudySource.Manual) {
+        return words.filter(w => w.aiGenerated === false);
+    } else if (settings.preferredStudySource === StudySource.AiGenerated) {
+        return words.filter(w => w.aiGenerated === true);
+    }
+    return words;
+  }, [words, settings.preferredStudySource]);
+
   const startSession = (mode: StudyMode) => {
     const now = Date.now();
-    
-    // Filter by Source (Manual / AI / All)
-    let eligibleWords = words;
-    if (settings.preferredStudySource === StudySource.Manual) {
-        eligibleWords = words.filter(w => !w.aiGenerated);
-    } else if (settings.preferredStudySource === StudySource.AiGenerated) {
-        eligibleWords = words.filter(w => w.aiGenerated);
-    }
+    const eligibleWords = getEligibleWords; // use memoized result
 
     // Filter by Due Date (SRS)
     const dueWords = eligibleWords.filter(w => w.nextReview <= now || w.status === WordStatus.New)
@@ -60,8 +66,9 @@ const App: React.FC = () => {
         
         // Try fallback to just random learning if SRS is empty but we have words
         const fallbackWords = eligibleWords.sort(() => 0.5 - Math.random()).slice(0, 10);
+        
         if (fallbackWords.length > 0) {
-             if (confirm(`Brak słów do powtórki (SRS) z kategorii: ${sourceText}. Czy chcesz uruchomić tryb swobodny?`)) {
+             if (confirm(`Brak słów wymagających powtórki w kategorii: ${sourceText}. Czy chcesz uruchomić tryb swobodny z ${fallbackWords.length} słowami?`)) {
                  setSessionWords(fallbackWords);
                  setStudyMode(mode);
                  setIsStudying(true);
@@ -69,7 +76,7 @@ const App: React.FC = () => {
              return;
         }
 
-        alert(`Brak słówek w kategorii: ${sourceText}. Dodaj nowe słowa ręcznie lub wygeneruj przez AI.`);
+        alert(`Brak dostępnych słówek w kategorii: ${sourceText}. Dodaj nowe słowa lub zmień filtr.`);
         return;
     }
 
@@ -235,6 +242,10 @@ const App: React.FC = () => {
                    ))}
                </div>
            </div>
+           
+           <div className="text-sm text-slate-500 mb-4 px-1">
+              Dostępne słowa w wybranym trybie: <span className="font-bold text-indigo-600">{getEligibleWords.length}</span>
+           </div>
 
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                <button onClick={() => startSession(StudyMode.Flashcards)} className="flex items-center p-6 bg-gradient-to-br from-indigo-500 to-violet-600 text-white rounded-2xl shadow-lg hover:shadow-xl transition-all hover:scale-[1.02]">
@@ -294,26 +305,50 @@ const App: React.FC = () => {
   );
 
   // --- WORDS LIST VIEW ---
-  const renderWordList = () => (
+  const renderWordList = () => {
+      // Filter list based on UI selection in Word List tab
+      const filteredList = words.filter(w => {
+          if (listFilter === StudySource.Manual) return !w.aiGenerated;
+          if (listFilter === StudySource.AiGenerated) return w.aiGenerated;
+          return true;
+      });
+
+      return (
       <div className="space-y-4">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold">Baza Słów ({words.length})</h2>
-            <button 
-                onClick={() => setIsAddModalOpen(true)}
-                className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700"
-            >
-                + Dodaj
-            </button>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+            <h2 className="text-2xl font-bold">Baza Słów ({filteredList.length})</h2>
+            
+            <div className="flex gap-2 w-full md:w-auto">
+                 {/* List Filter */}
+                 <select 
+                    value={listFilter}
+                    onChange={(e) => setListFilter(e.target.value as StudySource)}
+                    className="p-2 border border-slate-300 rounded-lg text-sm bg-white"
+                 >
+                     <option value={StudySource.All}>Wszystkie</option>
+                     <option value={StudySource.Manual}>Tylko moje</option>
+                     <option value={StudySource.AiGenerated}>Tylko AI</option>
+                 </select>
+
+                <button 
+                    onClick={() => setIsAddModalOpen(true)}
+                    className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 flex-1 md:flex-none text-center"
+                >
+                    + Dodaj
+                </button>
+            </div>
           </div>
           
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              {words.map((word, idx) => (
-                  <div key={word.id} className={`p-4 flex justify-between items-center ${idx !== words.length-1 ? 'border-b border-slate-100' : ''}`}>
+              {filteredList.map((word, idx) => (
+                  <div key={word.id} className={`p-4 flex justify-between items-center ${idx !== filteredList.length-1 ? 'border-b border-slate-100' : ''}`}>
                       <div>
                           <div className="font-bold text-slate-800">{word.english}</div>
                           <div className="text-sm text-slate-500">{word.polish}</div>
-                          <div className="text-xs text-slate-400 mt-1">
-                              {word.aiGenerated ? '✨ AI' : '👤 Ręczne'} | Kat: {word.category}
+                          <div className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                              {word.aiGenerated ? '✨ AI' : '👤 Ręczne'} 
+                              <span className="text-slate-300">|</span> 
+                              Kat: {word.category}
                           </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -338,10 +373,14 @@ const App: React.FC = () => {
                       </div>
                   </div>
               ))}
-              {words.length === 0 && <div className="p-8 text-center text-slate-400">Brak słów. Użyj generatora AI lub dodaj ręcznie!</div>}
+              {filteredList.length === 0 && (
+                  <div className="p-8 text-center text-slate-400">
+                      Brak słów spełniających kryteria.
+                  </div>
+              )}
           </div>
       </div>
-  );
+  )};
 
   // --- SETTINGS VIEW ---
   const renderSettings = () => (

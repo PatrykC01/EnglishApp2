@@ -80,7 +80,7 @@ export const geminiService = {
    */
   generateImage: async (word: string, context: string): Promise<string> => {
     const settings = storageService.getSettings();
-    const apiKey = process.env.API_KEY || settings.aiApiKey;
+    const apiKey = process.env.API_KEY;
     const hfKey = settings.huggingFaceApiKey;
     
     // 1. Attempt Gemini Image Gen
@@ -91,7 +91,7 @@ export const geminiService = {
           model: 'gemini-2.5-flash-image',
           contents: `A simple, minimalist, vector-style illustration of "${word}". Context: ${context}. White background. No text.`,
           config: {
-            responseMimeType: 'image/png' // Requesting image output implicitly via model capability
+            // responseMimeType is not supported for gemini-2.5-flash-image
           }
         });
 
@@ -156,7 +156,7 @@ export const geminiService = {
    */
   checkTranslation: async (polishWord: string, userEnglishInput: string): Promise<{ isCorrect: boolean; feedback: string }> => {
      const settings = storageService.getSettings();
-     const apiKey = process.env.API_KEY || settings.aiApiKey;
+     const apiKey = process.env.API_KEY;
      
      if (!apiKey) {
         // Simple string comparison fallback

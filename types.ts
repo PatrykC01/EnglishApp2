@@ -14,6 +14,12 @@ export enum StudyMode {
   Listening = 'listening',
 }
 
+export enum StudySource {
+  All = 'all',
+  Manual = 'manual',
+  AiGenerated = 'ai',
+}
+
 export enum WordStatus {
   New = 'new',
   Learning = 'learning',
@@ -41,10 +47,11 @@ export interface Settings {
   dailyGoal: number;
   level: LanguageLevel;
   aiProvider: 'gemini' | 'free';
-  aiModelType: 'flash' | 'pro'; // New setting
+  aiModelType: 'flash' | 'pro';
   huggingFaceApiKey: string;
   enableTTS: boolean;
   enableSoundEffects: boolean;
+  preferredStudySource: StudySource; // New setting
 }
 
 export interface AppStats {

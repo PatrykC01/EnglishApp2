@@ -335,13 +335,28 @@ const App: React.FC = () => {
                   <hr className="my-4 border-slate-100" />
                   
                   <div>
-                       <h4 className="text-sm font-semibold text-slate-700 mb-2">Generowanie Obrazów</h4>
-                       <p className="text-xs text-slate-500 mb-2">
-                           Domyślnie używa Gemini. Jeśli limit zostanie wyczerpany, automatycznie przełączy się na darmowe Pollinations.ai.
+                       <h4 className="text-sm font-semibold text-slate-700 mb-2">Generowanie Obrazów (Hugging Face)</h4>
+                       <p className="text-xs text-slate-500 mb-3">
+                           Podaj swój klucz API z <a href="https://huggingface.co/settings/tokens" target="_blank" className="text-indigo-600 underline">huggingface.co</a>, aby używać modelu Stable Diffusion 2.1 (Wyższa jakość).
+                           Bez klucza używany będzie Pollinations.ai.
                        </p>
-                       <div className="p-3 bg-green-50 rounded-lg text-sm text-green-700 border border-green-100">
-                           ✅ Integracja Pollinations.ai aktywna (Brak limitów)
-                       </div>
+                       <label className="block text-sm text-slate-500 mb-1">Klucz API Hugging Face (Opcjonalne)</label>
+                       <input 
+                         type="password" 
+                         value={settings.huggingFaceApiKey}
+                         placeholder="hf_..."
+                         onChange={(e) => {
+                             const newSettings = { ...settings, huggingFaceApiKey: e.target.value };
+                             setSettings(newSettings);
+                             storageService.saveSettings(newSettings);
+                         }}
+                         className="w-full p-2 border rounded-lg bg-slate-50 font-mono text-sm"
+                       />
+                       {settings.huggingFaceApiKey ? (
+                          <div className="mt-2 text-xs text-green-600">✅ Klucz zapisany. Używanie Stable Diffusion via Vercel Proxy.</div>
+                       ) : (
+                          <div className="mt-2 text-xs text-blue-500">ℹ️ Brak klucza. Używanie darmowego Pollinations.ai.</div>
+                       )}
                    </div>
               </div>
           </div>

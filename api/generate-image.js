@@ -11,8 +11,9 @@ export default async function handler(req, res) {
 
   try {
     // Call Hugging Face Inference API from the server side
+    // Updated endpoint: api-inference.huggingface.co is deprecated, replaced by router.huggingface.co
     const response = await fetch(
-      "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1",
+      "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-2-1",
       {
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -25,7 +26,13 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      return res.status(response.status).json({ error: `HF Error: ${errorText}` });
+      // Try to parse clean JSON error
+      try {
+          const jsonError = JSON.parse(errorText);
+          return res.status(response.status).json({ error: jsonError.error || errorText });
+      } catch {
+          return res.status(response.status).json({ error: `HF Error: ${errorText}` });
+      }
     }
 
     // Convert the raw image blob to base64

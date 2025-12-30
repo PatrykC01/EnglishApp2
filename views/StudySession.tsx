@@ -7,6 +7,7 @@ interface StudySessionProps {
   mode: StudyMode;
   words: Word[];
   onComplete: (results: { wordId: string; correct: boolean }[]) => void;
+  onUpdateWord?: (word: Word) => void;
   onExit: () => void;
 }
 
@@ -17,7 +18,7 @@ interface MatchCard {
   state: 'default' | 'selected' | 'matched' | 'wrong';
 }
 
-const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, onExit }) => {
+const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, onUpdateWord, onExit }) => {
   // General State
   const [currentIndex, setCurrentIndex] = useState(0);
   const [results, setResults] = useState<{ wordId: string; correct: boolean }[]>([]);
@@ -39,16 +40,36 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
   useEffect(() => {
     if (currentWord && (mode === StudyMode.Flashcards || mode === StudyMode.Typing || mode === StudyMode.Listening)) {
         setCurrentImage(undefined);
+        
         if (currentWord.imageUrl) {
             setCurrentImage(currentWord.imageUrl);
         } else {
             // Generate on the fly using the example sentence for context if available
             geminiService.generateImage(currentWord.english, currentWord.exampleSentence)
-                .then(url => setCurrentImage(url))
+                .then(url => {
+                    setCurrentImage(url);
+                    // SAVE the generated image to the word so we don't re-generate next time (CACHE)
+                    if (onUpdateWord) {
+                        onUpdateWord({ ...currentWord, imageUrl: url });
+                    }
+                })
                 .catch(err => console.error(err));
         }
     }
-  }, [currentWord, mode]);
+  }, [currentWord, mode]); // removed onUpdateWord dependency to avoid loops
+
+  const handleRegenerateImage = () => {
+     if (!currentWord) return;
+     setCurrentImage(undefined);
+     geminiService.generateImage(currentWord.english, currentWord.exampleSentence)
+        .then(url => {
+            setCurrentImage(url);
+            if (onUpdateWord) {
+                onUpdateWord({ ...currentWord, imageUrl: url });
+            }
+        })
+        .catch(err => console.error(err));
+  };
 
   // Initialize Match Mode
   useEffect(() => {
@@ -160,6 +181,7 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
             word={currentWord} 
             onResult={handleNext} 
             imageUrl={currentImage}
+            onRegenerateImage={handleRegenerateImage}
         />
         <p className="mt-8 text-xs text-slate-400">Przesuń w prawo jeśli umiesz, w lewo jeśli nie.</p>
       </div>

@@ -13,6 +13,7 @@ const DEFAULT_SETTINGS: Settings = {
   aiProvider: 'free',
   aiModelType: 'flash',
   huggingFaceApiKey: '',
+  deepAiApiKey: '', // Initialize new field
   enableTTS: true,
   enableSoundEffects: true,
   preferredStudySource: StudySource.All,

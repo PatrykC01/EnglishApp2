@@ -10,14 +10,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Call Hugging Face Inference API from the server side
-    // Correct URL for router: https://router.huggingface.co/models/<model_id>
-    const response = await fetch(
-      "https://router.huggingface.co/models/stabilityai/stable-diffusion-2-1",
-      {
+    // We use Stable Diffusion XL Base 1.0 which is widely available on the Inference API
+    const model = "stabilityai/stable-diffusion-xl-base-1.0";
+    const apiUrl = `https://api-inference.huggingface.co/models/${model}`;
+
+    const response = await fetch(apiUrl, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
+          "x-use-cache": "false" // Request fresh generation
         },
         method: "POST",
         body: JSON.stringify({ inputs: prompt }),
@@ -26,13 +27,11 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      // Try to parse clean JSON error
       try {
           const jsonError = JSON.parse(errorText);
-          // Sometimes HF returns specific error objects
           return res.status(response.status).json({ error: jsonError.error || errorText });
       } catch {
-          return res.status(response.status).json({ error: `HF Error: ${errorText}` });
+          return res.status(response.status).json({ error: `HF Error (${response.status}): ${errorText}` });
       }
     }
 

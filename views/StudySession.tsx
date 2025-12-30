@@ -42,8 +42,8 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
         if (currentWord.imageUrl) {
             setCurrentImage(currentWord.imageUrl);
         } else {
-            // Generate on the fly
-            geminiService.generateImage(currentWord.english, currentWord.polish)
+            // Generate on the fly using the example sentence for context if available
+            geminiService.generateImage(currentWord.english, currentWord.exampleSentence)
                 .then(url => setCurrentImage(url))
                 .catch(err => console.error(err));
         }

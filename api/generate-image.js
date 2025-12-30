@@ -11,9 +11,9 @@ export default async function handler(req, res) {
 
   try {
     // Call Hugging Face Inference API from the server side
-    // Updated endpoint: api-inference.huggingface.co is deprecated, replaced by router.huggingface.co
+    // Correct URL for router: https://router.huggingface.co/models/<model_id>
     const response = await fetch(
-      "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-2-1",
+      "https://router.huggingface.co/models/stabilityai/stable-diffusion-2-1",
       {
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -29,6 +29,7 @@ export default async function handler(req, res) {
       // Try to parse clean JSON error
       try {
           const jsonError = JSON.parse(errorText);
+          // Sometimes HF returns specific error objects
           return res.status(response.status).json({ error: jsonError.error || errorText });
       } catch {
           return res.status(response.status).json({ error: `HF Error: ${errorText}` });

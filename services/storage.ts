@@ -38,7 +38,12 @@ export const storageService = {
   getWords: (): Word[] => {
     try {
       const data = localStorage.getItem(KEYS.WORDS);
-      return data ? JSON.parse(data) : SEED_WORDS;
+      const words = data ? JSON.parse(data) : SEED_WORDS;
+      // Data migration: Ensure aiGenerated is a boolean for older data
+      return words.map((w: any) => ({
+        ...w,
+        aiGenerated: w.aiGenerated === true // Forces undefined/null/false to false
+      }));
     } catch {
       return SEED_WORDS;
     }

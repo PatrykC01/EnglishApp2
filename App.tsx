@@ -416,11 +416,13 @@ const App: React.FC = () => {
                       >
                           <option value="gemini">Google Gemini (Tekst + Obraz)</option>
                           <option value="pollinations">Pollinations.ai (Tylko Obrazy, Darmowe)</option>
+                          <option value="deepai">DeepAI (Tylko Obrazy, Wymaga Klucza)</option>
                           <option value="free">Tryb Offline / Podstawowy</option>
                       </select>
                       <p className="text-xs text-slate-400 mt-1">
                         {settings.aiProvider === 'gemini' && "Wymaga API Key. Najlepsza jakość i generowanie słów."}
-                        {settings.aiProvider === 'pollinations' && "Darmowe generowanie obrazków w stylu Craiyon/Flux. Generowanie słów niedostępne."}
+                        {settings.aiProvider === 'pollinations' && "Darmowe generowanie obrazków. Może mieć limity."}
+                        {settings.aiProvider === 'deepai' && "Alternatywa dla Pollinations. Wymaga darmowego klucza API ze strony deepai.org."}
                         {settings.aiProvider === 'free' && "Brak AI. Tylko ręczne dodawanie."}
                       </p>
                   </div>
@@ -462,7 +464,27 @@ const App: React.FC = () => {
                       </div>
                   )}
 
-                  {settings.aiProvider !== 'pollinations' && (
+                  {settings.aiProvider === 'deepai' && (
+                    <div className="mt-4">
+                         <h4 className="text-sm font-semibold text-slate-700 mb-2">Klucz DeepAI</h4>
+                         <input 
+                           type="password" 
+                           value={settings.deepAiApiKey}
+                           placeholder="Wklej klucz z deepai.org"
+                           onChange={(e) => {
+                               const newSettings = { ...settings, deepAiApiKey: e.target.value };
+                               setSettings(newSettings);
+                               storageService.saveSettings(newSettings);
+                           }}
+                           className="w-full p-2 border rounded-lg bg-slate-50 font-mono text-sm"
+                         />
+                         <div className="mt-2 text-xs text-blue-500">
+                             ℹ️ Zarejestruj się na deepai.org, aby otrzymać klucz.
+                         </div>
+                     </div>
+                  )}
+
+                  {settings.aiProvider !== 'pollinations' && settings.aiProvider !== 'deepai' && (
                   <>
                     <hr className="my-4 border-slate-100" />
                     <div>

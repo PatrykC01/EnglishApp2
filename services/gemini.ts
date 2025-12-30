@@ -22,8 +22,6 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey });
 
     // Select model based on settings
-    // Basic Text Tasks: 'gemini-3-flash-preview'
-    // Complex Text Tasks: 'gemini-3-pro-preview'
     const modelName = settings.aiModelType === 'pro' 
         ? 'gemini-3-pro-preview' 
         : 'gemini-3-flash-preview';
@@ -83,6 +81,54 @@ export const geminiService = {
   },
 
   /**
+   * Translates a single word and provides context.
+   * Used for the "Add Word" modal when one field is missing.
+   */
+  translateWord: async (
+      inputWord: string, 
+      inputLang: 'pl' | 'en'
+  ): Promise<{ translation: string; exampleSentence: string }> => {
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) throw new Error("API Key is missing for translation");
+
+      const ai = new GoogleGenAI({ apiKey });
+      const targetLang = inputLang === 'pl' ? 'English' : 'Polish';
+      const sourceLang = inputLang === 'pl' ? 'Polish' : 'English';
+
+      const prompt = `
+          Translate the ${sourceLang} word "${inputWord}" to ${targetLang}.
+          Also provide a simple example English sentence using the English word.
+          Return JSON only.
+      `;
+
+      try {
+          const response = await ai.models.generateContent({
+              model: "gemini-3-flash-preview",
+              contents: prompt,
+              config: {
+                  responseMimeType: "application/json",
+                  responseSchema: {
+                      type: Type.OBJECT,
+                      properties: {
+                          translation: { type: Type.STRING },
+                          exampleSentence: { type: Type.STRING }
+                      },
+                      required: ["translation", "exampleSentence"]
+                  }
+              }
+          });
+          
+          if (response.text) {
+              return JSON.parse(response.text);
+          }
+          throw new Error("Empty response");
+      } catch (e) {
+          console.error("Translation error", e);
+          throw e;
+      }
+  },
+
+  /**
    * Generates an image for a word.
    * Priority: Gemini -> Hugging Face (via Proxy) -> Pollinations.ai (Fallback)
    */
@@ -135,12 +181,11 @@ export const geminiService = {
                 const data = await response.json();
                 if (data.image) return data.image;
             } else {
-                // If proxy returns 4xx/5xx, we log it but don't crash, allowing fallback
                 const errText = await response.text();
                 console.warn("HF Proxy returned error (Switching to Fallback):", errText);
             }
         } catch (e) {
-            console.warn("HF Proxy failed (Are you running locally without 'vercel dev'?). Switching to Fallback.", e);
+            console.warn("HF Proxy failed. Switching to Fallback.", e);
         }
     }
 
@@ -157,14 +202,7 @@ export const geminiService = {
   checkTranslation: async (polishWord: string, userEnglishInput: string): Promise<{ isCorrect: boolean; feedback: string }> => {
      const apiKey = process.env.API_KEY;
      
-     // Fallback function for basic string check
-     const basicCheck = () => {
-         // This is a last resort fallback
-         return {
-             isCorrect: false, 
-             feedback: "AI_ERROR" 
-         };
-     };
+     const basicCheck = () => ({ isCorrect: false, feedback: "AI_ERROR" });
 
      if (!apiKey) return basicCheck();
 

@@ -101,9 +101,8 @@ const App: React.FC = () => {
       setIsGenerating(true);
       try {
           // If free provider, we can't really generate well. 
-          // Assuming user has set API key if provider is gemini.
           if (settings.aiProvider === 'free') {
-              alert("Proszę skonfigurować API Key w ustawieniach (Gemini), aby generować słowa.");
+              alert("Proszę wybrać dostawcę Gemini w ustawieniach, aby generować słowa.");
               setIsGenerating(false);
               return;
           }
@@ -119,7 +118,7 @@ const App: React.FC = () => {
               alert(`Dodano ${newWords.length} słów!`);
           }
       } catch (e) {
-          alert("Błąd generowania. Sprawdź klucz API.");
+          alert("Błąd generowania. Sprawdź konfigurację API Key.");
           console.error(e);
       } finally {
           setIsGenerating(false);
@@ -291,22 +290,9 @@ const App: React.FC = () => {
                       </select>
                   </div>
                   {settings.aiProvider === 'gemini' && (
-                       <div>
-                       <label className="block text-sm text-slate-500 mb-1">Klucz API Gemini</label>
-                       <input 
-                         type="password" 
-                         value={settings.aiApiKey}
-                         placeholder="Wklej klucz API tutaj..."
-                         onChange={(e) => {
-                             const newSettings = { ...settings, aiApiKey: e.target.value };
-                             setSettings(newSettings);
-                             storageService.saveSettings(newSettings);
-                             process.env.API_KEY = e.target.value; 
-                         }}
-                         className="w-full p-2 border rounded-lg"
-                       />
-                       <p className="text-xs text-slate-400 mt-1">Używany do generowania słówek i definicji.</p>
-                   </div>
+                       <div className="p-3 bg-indigo-50 rounded-lg text-sm text-indigo-700">
+                           API Google Gemini jest aktywne (zmienna środowiskowa).
+                       </div>
                   )}
 
                   <hr className="my-4 border-slate-100" />

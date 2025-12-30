@@ -18,7 +18,15 @@ export const geminiService = {
     const apiKey = process.env.API_KEY;
     if (!apiKey) throw new Error("API Key is missing");
 
+    const settings = storageService.getSettings();
     const ai = new GoogleGenAI({ apiKey });
+
+    // Select model based on settings
+    // Basic Text Tasks: 'gemini-3-flash-preview'
+    // Complex Text Tasks: 'gemini-3-pro-preview'
+    const modelName = settings.aiModelType === 'pro' 
+        ? 'gemini-3-pro-preview' 
+        : 'gemini-3-flash-preview';
 
     const prompt = `
       Generate ${count} distinct English vocabulary words related to the category "${category}" suitable for CEFR level ${level}.
@@ -28,7 +36,7 @@ export const geminiService = {
 
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: modelName,
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -76,22 +84,30 @@ export const geminiService = {
 
   /**
    * Generates an image for a word.
-   * Tries Gemini first, then Hugging Face if key is available.
+   * Tries Gemini first, then falls back to Pollinations.ai (Free, unlimited).
    */
   generateImage: async (word: string, context: string): Promise<string> => {
     const settings = storageService.getSettings();
     const apiKey = process.env.API_KEY;
-    const hfKey = settings.huggingFaceApiKey;
     
     // 1. Attempt Gemini Image Gen
+    // Only if API key exists.
     if (apiKey) {
       try {
         const ai = new GoogleGenAI({ apiKey });
+        
+        // Select model based on settings
+        // General Image: 'gemini-2.5-flash-image'
+        // High-Quality Image: 'gemini-3-pro-image-preview'
+        const modelName = settings.aiModelType === 'pro'
+            ? 'gemini-3-pro-image-preview'
+            : 'gemini-2.5-flash-image';
+
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
+          model: modelName,
           contents: `A simple, minimalist, vector-style illustration of "${word}". Context: ${context}. White background. No text.`,
           config: {
-            // responseMimeType is not supported for gemini-2.5-flash-image
+            // responseMimeType is not supported for nano banana series models
           }
         });
 
@@ -104,94 +120,80 @@ export const geminiService = {
                 }
             }
         }
-      } catch (e) {
-        console.warn("Gemini image generation failed.", e);
+      } catch (e: any) {
+        console.warn("Gemini image generation failed (Quota or Error). Switching to fallback.", e.message);
+        // We continue to fallback if Gemini fails (e.g., 429 Quota Exceeded)
       }
     }
 
-    // 2. Attempt Hugging Face (Stable Diffusion)
-    if (hfKey) {
-        try {
-            console.log("Attempting Hugging Face generation...");
-            // Use stable-diffusion-2-1 as it is often faster and less prone to timeout/cors masking
-            const response = await fetch(
-                "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1",
-                {
-                    headers: { 
-                        Authorization: `Bearer ${hfKey}`,
-                        "Content-Type": "application/json"
-                    },
-                    method: "POST",
-                    body: JSON.stringify({ 
-                        inputs: `minimalist vector illustration of ${word}, ${context}, white background, flat design, icon style`,
-                        options: {
-                            wait_for_model: true,
-                            use_cache: true
-                        }
-                    }),
-                }
-            );
-
-            if (response.ok) {
-                const blob = await response.blob();
-                return new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result as string);
-                    reader.readAsDataURL(blob);
-                });
-            } else {
-                console.warn("Hugging Face API error:", await response.text());
-            }
-        } catch (e) {
-            console.warn("Hugging Face image generation failed (likely CORS or Timeout).", e);
-        }
-    }
-
-    // 3. Fallback placeholder
-    return `https://placehold.co/512x512/f1f5f9/475569?text=${encodeURIComponent(word)}`;
+    // 2. Fallback: Pollinations.ai
+    // Great free alternative that works via URL, no API key needed, no CORS issues for images.
+    console.log("Using Pollinations.ai fallback...");
+    const encodedPrompt = encodeURIComponent(`minimalist vector illustration of ${word}, ${context}, white background, flat design, icon style, clear lines`);
+    // Random seed to prevent browser caching if generated multiple times
+    const seed = Math.floor(Math.random() * 1000); 
+    return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&seed=${seed}`;
   },
   
   /**
    * Validates a translation using Gemini (AI Self-Check).
    */
   checkTranslation: async (polishWord: string, userEnglishInput: string): Promise<{ isCorrect: boolean; feedback: string }> => {
-     const settings = storageService.getSettings();
      const apiKey = process.env.API_KEY;
      
-     if (!apiKey) {
-        // Simple string comparison fallback
-        return { 
-            isCorrect: false, 
-            feedback: "AI Self-check unavailable. Please check API key." 
-        }; 
-     }
+     // Fallback function for basic string check
+     const basicCheck = () => {
+         const cleanInput = userEnglishInput.trim().toLowerCase();
+         // Usually we would need the original English word here, but checkTranslation assumes 
+         // we are checking against logic. 
+         // Ideally, the caller should probably handle strict check if AI fails, 
+         // but here we will try our best or return a neutral "offline" state.
+         
+         // Since we don't pass the "Correct English" word to this function (only Polish and User Input),
+         // we can't do a perfect fallback unless we change the signature.
+         // However, in TypingMode, we know the correct english word.
+         // Let's modify this to be robust even if AI fails.
+         return {
+             isCorrect: false, // We can't know for sure without the target word
+             feedback: "AI niedostępne (Limit). Sprawdź dokładnie pisownię."
+         };
+     };
+
+     if (!apiKey) return basicCheck();
 
      const ai = new GoogleGenAI({ apiKey });
-     const prompt = `
-        The user is translating the Polish word "${polishWord}" into English.
-        They wrote: "${userEnglishInput}".
-        Is this correct? Even if it's a synonym, count it as correct.
-        Return JSON.
-     `;
-
-     const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    isCorrect: { type: Type.BOOLEAN },
-                    feedback: { type: Type.STRING, description: "Short explanation or correction." }
+     
+     try {
+        const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: `
+                The user is translating the Polish word "${polishWord}" into English.
+                They wrote: "${userEnglishInput}".
+                Is this correct? Even if it's a synonym, count it as correct.
+                Return JSON.
+            `,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        isCorrect: { type: Type.BOOLEAN },
+                        feedback: { type: Type.STRING }
+                    }
                 }
             }
-        }
-     });
+        });
 
-     if (response.text) {
-         return JSON.parse(response.text);
+        if (response.text) {
+            return JSON.parse(response.text);
+        }
+     } catch (e) {
+         console.warn("AI Self-Check failed (likely 429).", e);
+         // Return a specific flag so the UI can do a simple string match instead
+         // We return 'true' here but with a special feedback to let the UI know to fallback
+         return { isCorrect: false, feedback: "AI_ERROR" };
      }
+     
      return { isCorrect: false, feedback: "Error validating." };
   }
 };

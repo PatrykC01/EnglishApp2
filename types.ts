@@ -46,12 +46,13 @@ export interface Settings {
   userName: string;
   dailyGoal: number;
   level: LanguageLevel;
-  aiProvider: 'gemini' | 'free';
+  aiProvider: 'gemini' | 'free' | 'pollinations' | 'deepai'; // Added 'deepai'
   aiModelType: 'flash' | 'pro';
   huggingFaceApiKey: string;
+  deepAiApiKey: string; // New field
   enableTTS: boolean;
   enableSoundEffects: boolean;
-  preferredStudySource: StudySource; // New setting
+  preferredStudySource: StudySource;
 }
 
 export interface AppStats {

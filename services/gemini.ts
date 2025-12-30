@@ -1,43 +1,70 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { Word, LanguageLevel, WordStatus } from "../types";
 import { storageService } from "./storage";
+import { perplexityService } from "./perplexity";
 
-// Helper to generate a unique ID
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 export const geminiService = {
   /**
-   * Generates a list of vocabulary words using Gemini.
+   * Helper for OpenAI-compatible Chat APIs (Custom, Kie-API, subnp.com)
    */
+  fetchCustomAI: async (prompt: string, isJson: boolean = true) => {
+    const s = storageService.getSettings();
+    if (!s.customApiKey || !s.customApiBase) throw new Error("Missing Custom API Config");
+
+    const baseUrl = s.customApiBase.endsWith('/') ? s.customApiBase.slice(0, -1) : s.customApiBase;
+    
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${s.customApiKey}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            model: s.customModelName || "gpt-4o-mini",
+            messages: [{ role: "user", content: prompt }],
+            response_format: isJson ? { type: "json_object" } : undefined
+        })
+    });
+    const data = await response.json();
+    if (data.error) throw new Error(data.error.message || "Custom API Error");
+    return data.choices[0].message.content;
+  },
+
   generateWords: async (
     category: string,
     level: LanguageLevel,
     count: number,
-    existingWords: string[] // List of English words to avoid duplicates
+    existingWords: string[]
   ): Promise<Word[]> => {
-    const apiKey = process.env.API_KEY;
-    // We only throw if provider is Gemini. If it's pollinations or free, we might handle it differently in the UI
-    if (!apiKey && storageService.getSettings().aiProvider === 'gemini') {
-        throw new Error("API Key is missing");
-    }
-
     const settings = storageService.getSettings();
-    if (settings.aiProvider !== 'gemini') {
-        throw new Error("Wybrano dostawcę, który nie obsługuje generowania słów (Tylko Gemini).");
+    
+    // Route to Custom API if selected
+    if (settings.aiProvider === 'custom') {
+        const prompt = `Generate exactly ${count} English vocabulary words for category "${category}" level ${level}. Exclude: ${existingWords.join(", ")}. Return ONLY a JSON array: [{"english": "...", "polish": "...", "exampleSentence": "..."}]`;
+        const content = await geminiService.fetchCustomAI(prompt);
+        const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
+        const rawData = JSON.parse(cleanContent);
+        return rawData.map((item: any) => ({
+            id: generateId(),
+            ...item,
+            category, level, status: WordStatus.New, nextReview: Date.now(), lastReview: null, attempts: 0, correct: 0, aiGenerated: true
+        }));
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    if (settings.aiProvider === 'perplexity') {
+        return perplexityService.generateWords(category, level, count, existingWords, settings.perplexityApiKey);
+    }
 
-    // Select model based on settings
-    const modelName = settings.aiModelType === 'pro' 
-        ? 'gemini-3-pro-preview' 
-        : 'gemini-3-flash-preview';
+    // Fix: Using process.env.API_KEY directly in GoogleGenAI constructor
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const modelName = settings.aiModelType === 'pro' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
 
-    const prompt = `
-      Generate ${count} distinct English vocabulary words related to the category "${category}" suitable for CEFR level ${level}.
-      Do not include these words: ${existingWords.join(", ")}.
-      For each word, provide the Polish translation and a simple example sentence.
-    `;
+    const prompt = `Generate ${count} English vocabulary words related to "${category}" for CEFR level ${level}. 
+    Exclude: ${existingWords.join(", ")}. 
+    Return JSON only: [{"english": "...", "polish": "...", "exampleSentence": "..."}]`;
 
     try {
       const response = await ai.models.generateContent({
@@ -62,8 +89,6 @@ export const geminiService = {
 
       if (response.text) {
         const rawData = JSON.parse(response.text);
-        
-        // Map to our Word interface
         return rawData.map((item: any) => ({
           id: generateId(),
           english: item.english,
@@ -76,223 +101,135 @@ export const geminiService = {
           lastReview: null,
           attempts: 0,
           correct: 0,
-          aiGenerated: true,
-          imageUrl: undefined, // Generated on demand or fallback
+          aiGenerated: true
         }));
       }
       return [];
     } catch (error) {
-      console.error("Gemini Generation Error:", error);
+      console.error("Gemini Error:", error);
       throw error;
     }
   },
 
-  /**
-   * Translates a single word and provides context.
-   * Used for the "Add Word" modal when one field is missing.
-   */
-  translateWord: async (
-      inputWord: string, 
-      inputLang: 'pl' | 'en'
-  ): Promise<{ translation: string; exampleSentence: string }> => {
-      const apiKey = process.env.API_KEY;
-      if (!apiKey) throw new Error("API Key is missing for translation");
+  translateWord: async (inputWord: string, inputLang: 'pl' | 'en'): Promise<{ translation: string; exampleSentence: string }> => {
+      const settings = storageService.getSettings();
+      const prompt = `Translate "${inputWord}" from ${inputLang === 'pl' ? 'Polish' : 'English'} to ${inputLang === 'pl' ? 'English' : 'Polish'}. Provide one example sentence. Return JSON: {"translation": "...", "exampleSentence": "..."}`;
 
-      const ai = new GoogleGenAI({ apiKey });
-      const targetLang = inputLang === 'pl' ? 'English' : 'Polish';
-      const sourceLang = inputLang === 'pl' ? 'Polish' : 'English';
-
-      const prompt = `
-          Translate the ${sourceLang} word "${inputWord}" to ${targetLang}.
-          Also provide a simple example English sentence using the English word.
-          Return JSON only.
-      `;
-
-      try {
-          const response = await ai.models.generateContent({
-              model: "gemini-3-flash-preview",
-              contents: prompt,
-              config: {
-                  responseMimeType: "application/json",
-                  responseSchema: {
-                      type: Type.OBJECT,
-                      properties: {
-                          translation: { type: Type.STRING },
-                          exampleSentence: { type: Type.STRING }
-                      },
-                      required: ["translation", "exampleSentence"]
-                  }
-              }
-          });
-          
-          if (response.text) {
-              return JSON.parse(response.text);
-          }
-          throw new Error("Empty response");
-      } catch (e) {
-          console.error("Translation error", e);
-          throw e;
+      if (settings.aiProvider === 'custom') {
+          const content = await geminiService.fetchCustomAI(prompt);
+          return JSON.parse(content.replace(/```json/g, '').replace(/```/g, '').trim());
       }
+
+      if (settings.aiProvider === 'perplexity') {
+          return perplexityService.translateWord(inputWord, inputLang, settings.perplexityApiKey);
+      }
+
+      // Fix: Using process.env.API_KEY directly in GoogleGenAI constructor
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const response = await ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: prompt,
+          config: { responseMimeType: "application/json" }
+      });
+      return JSON.parse(response.text || '{}');
   },
 
-  /**
-   * Generates an image for a word based on its context/sentence.
-   * Priority: Pollinations (if selected) -> Gemini -> Hugging Face (via Proxy) -> Pollinations (Fallback)
-   */
   generateImage: async (word: string, contextOrSentence?: string): Promise<string> => {
     const settings = storageService.getSettings();
-    const apiKey = process.env.API_KEY;
-    
-    // Construct the prompt. 
     const promptText = contextOrSentence 
         ? `minimalist illustration of ${word}, scene: ${contextOrSentence}, white background, flat vector design`
         : `minimalist vector illustration of ${word}, white background, flat design`;
 
-    // 0. Explicit Pollinations Selection (Craiyon-like free alternative)
-    if (settings.aiProvider === 'pollinations') {
-        const encodedPrompt = encodeURIComponent(promptText.slice(0, 300));
-        const seed = Math.floor(Math.random() * 10000);
-        // Removed 'model=flux' to use default Turbo model which has better rate limits
-        // Reduced size to 800x600 to be lighter on the free tier
-        return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=600&nologo=true&seed=${seed}`;
-    }
-    
-    // 0.5 Explicit DeepAI Selection
-    if (settings.aiProvider === 'deepai') {
-       if (!settings.deepAiApiKey) {
-           console.warn("Missing DeepAI key. Returning fallback.");
-           // Fall through to fallback
-       } else {
-           try {
-                console.log("Attempting DeepAI via Proxy...");
-                const response = await fetch('/api/generate-image', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        prompt: promptText,
-                        apiKey: settings.deepAiApiKey,
-                        provider: 'deepai'
-                    })
-                });
-    
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.image) return data.image;
-                } else {
-                    const errText = await response.text();
-                    console.warn("DeepAI Proxy returned error:", errText);
-                }
-           } catch (e) {
-               console.warn("DeepAI Proxy failed. Switching to Fallback.", e);
-           }
-       }
-    }
-
-    // 1. Attempt Gemini Image Gen (if API key exists)
-    if (apiKey && settings.aiProvider === 'gemini') {
-      try {
-        const ai = new GoogleGenAI({ apiKey });
-        const modelName = settings.aiModelType === 'pro'
-            ? 'gemini-3-pro-image-preview'
-            : 'gemini-2.5-flash-image';
-
-        const geminiPrompt = contextOrSentence 
-            ? `A clean, minimalist, vector-style illustration depicting: "${contextOrSentence}". Focus on "${word}". White background.`
-            : `A clean, minimalist, vector-style illustration of "${word}". White background.`;
-
-        const response = await ai.models.generateContent({
-          model: modelName,
-          contents: geminiPrompt,
-          config: {}
-        });
-
-        const parts = response.candidates?.[0]?.content?.parts;
-        if (parts) {
-            for (const part of parts) {
-                if (part.inlineData && part.inlineData.data) {
-                    return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                }
-            }
-        }
-      } catch (e: any) {
-        console.warn("Gemini image generation failed (likely quota). Trying next provider.");
-      }
-    }
-
-    // 2. Attempt Hugging Face (via Vercel Proxy)
-    if (settings.huggingFaceApiKey) {
+    // 0. Attempt Custom Image Gen if URL seems to support it
+    if (settings.aiProvider === 'custom' && settings.customApiBase.includes('images')) {
         try {
-            console.log("Attempting Hugging Face (SDXL) via Proxy...");
+            const baseUrl = settings.customApiBase.endsWith('/') ? settings.customApiBase.slice(0, -1) : settings.customApiBase;
+            const response = await fetch(`${baseUrl}/images/generations`, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${settings.customApiKey}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt: promptText, model: settings.customModelName || "dall-e-3" })
+            });
+            const data = await response.json();
+            if (data.data?.[0]?.url) return data.data[0].url;
+            if (data.data?.[0]?.b64_json) return `data:image/png;base64,${data.data[0].b64_json}`;
+        } catch (e) { console.warn("Custom Image API failed", e); }
+    }
+
+    // 1. DeepAI
+    if (settings.aiProvider === 'deepai' && settings.deepAiApiKey) {
+        try {
             const response = await fetch('/api/generate-image', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    prompt: promptText + ", vector art, 4k",
-                    apiKey: settings.huggingFaceApiKey,
-                    provider: 'huggingface'
-                })
+                body: JSON.stringify({ prompt: promptText, apiKey: settings.deepAiApiKey, provider: 'deepai' })
             });
-
             if (response.ok) {
                 const data = await response.json();
                 if (data.image) return data.image;
-            } else {
-                const errText = await response.text();
-                console.warn("HF Proxy returned error (Switching to Fallback):", errText);
             }
-        } catch (e) {
-            console.warn("HF Proxy failed. Switching to Fallback.", e);
-        }
+        } catch (e) { console.warn("DeepAI failed", e); }
     }
 
-    // 3. Fallback: Pollinations.ai (Standard Fallback)
-    console.log("Using Pollinations.ai fallback...");
-    const encodedPrompt = encodeURIComponent(promptText.slice(0, 300)); 
-    const seed = Math.floor(Math.random() * 1000); 
-    return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=600&nologo=true&seed=${seed}`;
+    // 2. Pollinations (Standard free fallback)
+    if (settings.aiProvider === 'pollinations' || settings.aiProvider === 'free' || settings.aiProvider === 'perplexity' || settings.aiProvider === 'custom') {
+        const seed = Math.floor(Math.random() * 10000);
+        return `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?width=800&height=600&nologo=true&seed=${seed}`;
+    }
+
+    // 3. Gemini Image
+    if (settings.aiProvider === 'gemini') {
+      try {
+        // Fix: Using process.env.API_KEY directly in GoogleGenAI constructor
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const modelName = settings.aiModelType === 'pro' ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: promptText,
+        });
+        const parts = response.candidates?.[0]?.content?.parts;
+        if (parts) {
+            for (const part of parts) {
+                if (part.inlineData) return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+            }
+        }
+      } catch (e) { console.warn("Gemini Image failed", e); }
+    }
+
+    return `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?width=800&height=600&nologo=true&seed=${Math.random()}`;
   },
   
-  /**
-   * Validates a translation using Gemini (AI Self-Check).
-   */
   checkTranslation: async (polishWord: string, userEnglishInput: string): Promise<{ isCorrect: boolean; feedback: string }> => {
-     const apiKey = process.env.API_KEY;
+     const settings = storageService.getSettings();
+     const prompt = `The user translates "${polishWord}" as "${userEnglishInput}". Is it correct? Return JSON: {"isCorrect": boolean, "feedback": "Short feedback in Polish"}`;
      
-     const basicCheck = () => ({ isCorrect: false, feedback: "AI_ERROR" });
+     if (settings.aiProvider === 'custom') {
+         try {
+            const content = await geminiService.fetchCustomAI(prompt);
+            return JSON.parse(content.replace(/```json/g, '').replace(/```/g, '').trim());
+         } catch (e) { return { isCorrect: false, feedback: "Błąd Custom API" }; }
+     }
 
-     if (!apiKey) return basicCheck();
+     if (settings.aiProvider === 'perplexity' && settings.perplexityApiKey) {
+         try {
+             const response = await fetch("https://api.perplexity.ai/chat/completions", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${settings.perplexityApiKey}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ model: "sonar", messages: [{ role: "user", content: prompt }] })
+             });
+             const data = await response.json();
+             return JSON.parse(data.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim());
+         } catch (e) { return { isCorrect: false, feedback: "Błąd Perplexity" }; }
+     }
 
-     const ai = new GoogleGenAI({ apiKey });
-     
+     // Fix: Using process.env.API_KEY directly in GoogleGenAI constructor
+     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
      try {
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
-            contents: `
-                The user is translating the Polish word "${polishWord}" into English.
-                They wrote: "${userEnglishInput}".
-                Is this correct? Even if it's a synonym, count it as correct.
-                Return JSON.
-            `,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        isCorrect: { type: Type.BOOLEAN },
-                        feedback: { type: Type.STRING }
-                    }
-                }
-            }
+            contents: prompt,
+            config: { responseMimeType: "application/json" }
         });
-
-        if (response.text) {
-            return JSON.parse(response.text);
-        }
-     } catch (e) {
-         console.warn("AI Self-Check failed (likely 429).", e);
-         return { isCorrect: false, feedback: "AI_ERROR" };
-     }
-     
-     return { isCorrect: false, feedback: "Error validating." };
+        return JSON.parse(response.text || '{}');
+     } catch (e) { return { isCorrect: false, feedback: "AI_ERROR" }; }
   }
 };

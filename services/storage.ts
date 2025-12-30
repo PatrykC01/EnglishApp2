@@ -13,7 +13,11 @@ const DEFAULT_SETTINGS: Settings = {
   aiProvider: 'free',
   aiModelType: 'flash',
   huggingFaceApiKey: '',
-  deepAiApiKey: '', // Initialize new field
+  deepAiApiKey: '',
+  perplexityApiKey: '',
+  customApiKey: '',
+  customApiBase: '',
+  customModelName: '',
   enableTTS: true,
   enableSoundEffects: true,
   preferredStudySource: StudySource.All,
@@ -40,10 +44,9 @@ export const storageService = {
     try {
       const data = localStorage.getItem(KEYS.WORDS);
       const words = data ? JSON.parse(data) : SEED_WORDS;
-      // Data migration: Ensure aiGenerated is a boolean for older data
       return words.map((w: any) => ({
         ...w,
-        aiGenerated: w.aiGenerated === true // Forces undefined/null/false to false
+        aiGenerated: w.aiGenerated === true
       }));
     } catch {
       return SEED_WORDS;

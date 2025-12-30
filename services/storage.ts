@@ -1,4 +1,4 @@
-import { Word, Settings, AppStats, LanguageLevel, WordStatus } from '../types';
+import { Word, Settings, AppStats, LanguageLevel, WordStatus, StudySource } from '../types';
 
 const KEYS = {
   WORDS: 'vocab_words',
@@ -15,6 +15,7 @@ const DEFAULT_SETTINGS: Settings = {
   huggingFaceApiKey: '',
   enableTTS: true,
   enableSoundEffects: true,
+  preferredStudySource: StudySource.All,
 };
 
 const DEFAULT_STATS: AppStats = {

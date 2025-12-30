@@ -1,0 +1,7 @@
+{
+  "name": "AI Vocabulary Builder",
+  "description": "An intelligent, AI-powered English vocabulary learning application featuring Spaced Repetition, multiple learning modes, and generative images.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

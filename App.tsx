@@ -126,11 +126,23 @@ const App: React.FC = () => {
     setIsStudying(false);
   };
 
+  const handleWordUpdate = (updatedWord: Word) => {
+    // Update master list and save to storage
+    const newMasterList = words.map(w => w.id === updatedWord.id ? updatedWord : w);
+    setWords(newMasterList);
+    storageService.saveWords(newMasterList);
+    
+    // Update current session list if we are studying, so the user sees the new data (e.g. image) immediately if they cycle back
+    if (isStudying) {
+        setSessionWords(prev => prev.map(w => w.id === updatedWord.id ? updatedWord : w));
+    }
+  };
+
   const handleGenerateWords = async (category: string) => {
       setIsGenerating(true);
       try {
           if (settings.aiProvider === 'free') {
-              alert("Proszę wybrać dostawcę Gemini w ustawieniach, aby generować słowa.");
+              alert("Proszę wybrać dostawcę Gemini w ustawieniach, aby generować słowa (Darmowy tryb obsługuje tylko generowanie obrazków, nie słów).");
               setIsGenerating(false);
               return;
           }
@@ -167,6 +179,7 @@ const App: React.FC = () => {
                 mode={studyMode} 
                 words={sessionWords} 
                 onComplete={handleSessionComplete}
+                onUpdateWord={handleWordUpdate}
                 onExit={() => setIsStudying(false)}
               />
           </div>
@@ -391,7 +404,7 @@ const App: React.FC = () => {
               <h3 className="font-bold mb-4 text-slate-700">Integracja AI</h3>
               <div className="space-y-4">
                   <div>
-                      <label className="block text-sm text-slate-500 mb-1">Dostawca (Tekst)</label>
+                      <label className="block text-sm text-slate-500 mb-1">Dostawca (Główny)</label>
                       <select 
                         value={settings.aiProvider}
                         onChange={(e) => {
@@ -399,12 +412,19 @@ const App: React.FC = () => {
                             setSettings(newSettings);
                             storageService.saveSettings(newSettings);
                         }}
-                        className="w-full p-2 border rounded-lg"
+                        className="w-full p-2 border rounded-lg bg-white"
                       >
-                          <option value="free">Darmowy (Tylko podstawy)</option>
-                          <option value="gemini">Google Gemini (Pełna moc)</option>
+                          <option value="gemini">Google Gemini (Tekst + Obraz)</option>
+                          <option value="pollinations">Pollinations.ai (Tylko Obrazy, Darmowe)</option>
+                          <option value="free">Tryb Offline / Podstawowy</option>
                       </select>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {settings.aiProvider === 'gemini' && "Wymaga API Key. Najlepsza jakość i generowanie słów."}
+                        {settings.aiProvider === 'pollinations' && "Darmowe generowanie obrazków w stylu Craiyon/Flux. Generowanie słów niedostępne."}
+                        {settings.aiProvider === 'free' && "Brak AI. Tylko ręczne dodawanie."}
+                      </p>
                   </div>
+
                    {/* Model Selection for Gemini */}
                   {settings.aiProvider === 'gemini' && (
                       <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
@@ -442,26 +462,30 @@ const App: React.FC = () => {
                       </div>
                   )}
 
-                  <hr className="my-4 border-slate-100" />
-                  <div>
-                       <h4 className="text-sm font-semibold text-slate-700 mb-2">Generowanie Obrazów (Hugging Face)</h4>
-                       <input 
-                         type="password" 
-                         value={settings.huggingFaceApiKey}
-                         placeholder="hf_..."
-                         onChange={(e) => {
-                             const newSettings = { ...settings, huggingFaceApiKey: e.target.value };
-                             setSettings(newSettings);
-                             storageService.saveSettings(newSettings);
-                         }}
-                         className="w-full p-2 border rounded-lg bg-slate-50 font-mono text-sm"
-                       />
-                       {settings.huggingFaceApiKey ? (
-                          <div className="mt-2 text-xs text-green-600">✅ Klucz zapisany.</div>
-                       ) : (
-                          <div className="mt-2 text-xs text-blue-500">ℹ️ Brak klucza. Używanie darmowego Pollinations.ai.</div>
-                       )}
-                   </div>
+                  {settings.aiProvider !== 'pollinations' && (
+                  <>
+                    <hr className="my-4 border-slate-100" />
+                    <div>
+                         <h4 className="text-sm font-semibold text-slate-700 mb-2">Alternatywne Obrazy (Hugging Face)</h4>
+                         <input 
+                           type="password" 
+                           value={settings.huggingFaceApiKey}
+                           placeholder="hf_..."
+                           onChange={(e) => {
+                               const newSettings = { ...settings, huggingFaceApiKey: e.target.value };
+                               setSettings(newSettings);
+                               storageService.saveSettings(newSettings);
+                           }}
+                           className="w-full p-2 border rounded-lg bg-slate-50 font-mono text-sm"
+                         />
+                         {settings.huggingFaceApiKey ? (
+                            <div className="mt-2 text-xs text-green-600">✅ Klucz zapisany.</div>
+                         ) : (
+                            <div className="mt-2 text-xs text-blue-500">ℹ️ Brak klucza. Jeśli Gemini zawiedzie, użyte zostanie Pollinations.</div>
+                         )}
+                     </div>
+                  </>
+                  )}
               </div>
           </div>
           

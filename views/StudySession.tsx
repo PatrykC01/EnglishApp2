@@ -26,6 +26,7 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
   // Typing Mode State
   const [typingInput, setTypingInput] = useState('');
   const [typingFeedback, setTypingFeedback] = useState<'neutral' | 'correct' | 'wrong'>('neutral');
+  const [typingMessage, setTypingMessage] = useState<string>('');
 
   // Match Mode State
   const [matchCards, setMatchCards] = useState<MatchCard[]>([]);
@@ -87,6 +88,7 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
       setCurrentIndex(currentIndex + 1);
       setTypingInput('');
       setTypingFeedback('neutral');
+      setTypingMessage('');
     } else {
       onComplete(newResults);
     }
@@ -165,13 +167,40 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
   }
 
   if (mode === StudyMode.Typing) {
-    const checkTyping = () => {
-        if (typingInput.trim().toLowerCase() === currentWord.english.toLowerCase()) {
+    const checkTyping = async () => {
+        setTypingFeedback('neutral');
+        setTypingMessage('Sprawdzanie...');
+        
+        // 1. First, try simple strict equality to save API calls
+        const cleanInput = typingInput.trim().toLowerCase();
+        const cleanTarget = currentWord.english.trim().toLowerCase();
+
+        if (cleanInput === cleanTarget) {
             setTypingFeedback('correct');
+            setTypingMessage('Idealnie!');
+            setTimeout(() => handleNext(true), 1000);
+            return;
+        }
+
+        // 2. If strict check fails, ask AI (for synonyms/typos)
+        const result = await geminiService.checkTranslation(currentWord.polish, typingInput);
+        
+        // 3. Handle AI Error (Fallback to strict check result, which we already know is false here)
+        if (result.feedback === 'AI_ERROR') {
+             setTypingFeedback('wrong');
+             setTypingMessage('Błędnie (AI niedostępne, wymagane dokładne tłumaczenie)');
+             setTimeout(() => handleNext(false), 2000);
+             return;
+        }
+
+        if (result.isCorrect) {
+            setTypingFeedback('correct');
+            setTypingMessage(result.feedback || 'Dobrze!');
             setTimeout(() => handleNext(true), 1000);
         } else {
             setTypingFeedback('wrong');
-            setTimeout(() => handleNext(false), 2000);
+            setTypingMessage(result.feedback || 'Spróbuj jeszcze raz');
+            setTimeout(() => handleNext(false), 2500);
         }
     };
 
@@ -208,11 +237,19 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
             Sprawdź
          </button>
          
-         {typingFeedback === 'wrong' && (
-             <div className="mt-4 text-red-500 font-medium">
-                 Poprawna odpowiedź: {currentWord.english}
-             </div>
-         )}
+         <div className="mt-4 text-center min-h-[1.5rem]">
+             {typingFeedback === 'wrong' && (
+                 <div className="text-red-500 font-medium animate-shake">
+                     {typingMessage} <br/>
+                     <span className="text-sm text-slate-500">Poprawnie: {currentWord.english}</span>
+                 </div>
+             )}
+             {typingFeedback === 'correct' && (
+                 <div className="text-green-600 font-medium">
+                     {typingMessage}
+                 </div>
+             )}
+         </div>
       </div>
     );
   }

@@ -10,15 +10,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    // We use Stable Diffusion XL Base 1.0 which is widely available on the Inference API
+    // We use Stable Diffusion XL Base 1.0
     const model = "stabilityai/stable-diffusion-xl-base-1.0";
-    const apiUrl = `https://api-inference.huggingface.co/models/${model}`;
+    
+    // Updated Endpoint: The old api-inference.huggingface.co is deprecated.
+    // The new standard format via router is: https://router.huggingface.co/hf-inference/models/<model_id>
+    const apiUrl = `https://router.huggingface.co/hf-inference/models/${model}`;
 
     const response = await fetch(apiUrl, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
-          "x-use-cache": "false" // Request fresh generation
+          "x-use-cache": "false"
         },
         method: "POST",
         body: JSON.stringify({ inputs: prompt }),

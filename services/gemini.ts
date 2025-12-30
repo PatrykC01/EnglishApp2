@@ -156,6 +156,37 @@ export const geminiService = {
         // Reduced size to 800x600 to be lighter on the free tier
         return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=600&nologo=true&seed=${seed}`;
     }
+    
+    // 0.5 Explicit DeepAI Selection
+    if (settings.aiProvider === 'deepai') {
+       if (!settings.deepAiApiKey) {
+           console.warn("Missing DeepAI key. Returning fallback.");
+           // Fall through to fallback
+       } else {
+           try {
+                console.log("Attempting DeepAI via Proxy...");
+                const response = await fetch('/api/generate-image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        prompt: promptText,
+                        apiKey: settings.deepAiApiKey,
+                        provider: 'deepai'
+                    })
+                });
+    
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.image) return data.image;
+                } else {
+                    const errText = await response.text();
+                    console.warn("DeepAI Proxy returned error:", errText);
+                }
+           } catch (e) {
+               console.warn("DeepAI Proxy failed. Switching to Fallback.", e);
+           }
+       }
+    }
 
     // 1. Attempt Gemini Image Gen (if API key exists)
     if (apiKey && settings.aiProvider === 'gemini') {
@@ -197,7 +228,8 @@ export const geminiService = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     prompt: promptText + ", vector art, 4k",
-                    apiKey: settings.huggingFaceApiKey
+                    apiKey: settings.huggingFaceApiKey,
+                    provider: 'huggingface'
                 })
             });
 

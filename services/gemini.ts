@@ -16,9 +16,16 @@ export const geminiService = {
     existingWords: string[] // List of English words to avoid duplicates
   ): Promise<Word[]> => {
     const apiKey = process.env.API_KEY;
-    if (!apiKey) throw new Error("API Key is missing");
+    // We only throw if provider is Gemini. If it's pollinations or free, we might handle it differently in the UI
+    if (!apiKey && storageService.getSettings().aiProvider === 'gemini') {
+        throw new Error("API Key is missing");
+    }
 
     const settings = storageService.getSettings();
+    if (settings.aiProvider !== 'gemini') {
+        throw new Error("Wybrano dostawcę, który nie obsługuje generowania słów (Tylko Gemini).");
+    }
+
     const ai = new GoogleGenAI({ apiKey });
 
     // Select model based on settings
@@ -130,17 +137,25 @@ export const geminiService = {
 
   /**
    * Generates an image for a word based on its context/sentence.
-   * Priority: Gemini -> Hugging Face (via Proxy) -> Pollinations.ai (Fallback)
+   * Priority: Pollinations (if selected) -> Gemini -> Hugging Face (via Proxy) -> Pollinations (Fallback)
    */
   generateImage: async (word: string, contextOrSentence?: string): Promise<string> => {
     const settings = storageService.getSettings();
     const apiKey = process.env.API_KEY;
     
-    // Construct the prompt. If a sentence is provided, use it to create a scene.
-    // If only the word is provided, fallback to a simple icon.
+    // Construct the prompt. 
     const promptText = contextOrSentence 
-        ? `A clean, minimalist, vector-style illustration depicting the following scene: "${contextOrSentence}". Focus on the concept of "${word}". White background, flat design, no text.`
-        : `A simple, minimalist, vector-style illustration of "${word}". White background. No text.`;
+        ? `minimalist illustration of ${word}, scene: ${contextOrSentence}, white background, flat vector design`
+        : `minimalist vector illustration of ${word}, white background, flat design`;
+
+    // 0. Explicit Pollinations Selection (Craiyon-like free alternative)
+    if (settings.aiProvider === 'pollinations') {
+        const encodedPrompt = encodeURIComponent(promptText.slice(0, 300));
+        const seed = Math.floor(Math.random() * 10000);
+        // Removed 'model=flux' to use default Turbo model which has better rate limits
+        // Reduced size to 800x600 to be lighter on the free tier
+        return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=600&nologo=true&seed=${seed}`;
+    }
 
     // 1. Attempt Gemini Image Gen (if API key exists)
     if (apiKey && settings.aiProvider === 'gemini') {
@@ -150,9 +165,13 @@ export const geminiService = {
             ? 'gemini-3-pro-image-preview'
             : 'gemini-2.5-flash-image';
 
+        const geminiPrompt = contextOrSentence 
+            ? `A clean, minimalist, vector-style illustration depicting: "${contextOrSentence}". Focus on "${word}". White background.`
+            : `A clean, minimalist, vector-style illustration of "${word}". White background.`;
+
         const response = await ai.models.generateContent({
           model: modelName,
-          contents: promptText,
+          contents: geminiPrompt,
           config: {}
         });
 
@@ -177,7 +196,7 @@ export const geminiService = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    prompt: promptText + ", high quality, 4k, vector art",
+                    prompt: promptText + ", vector art, 4k",
                     apiKey: settings.huggingFaceApiKey
                 })
             });
@@ -194,16 +213,11 @@ export const geminiService = {
         }
     }
 
-    // 3. Fallback: Pollinations.ai (Free, no key)
+    // 3. Fallback: Pollinations.ai (Standard Fallback)
     console.log("Using Pollinations.ai fallback...");
-    // Simplify prompt for URL length safety and style consistency
-    const simplePrompt = contextOrSentence 
-        ? `illustration of ${word} scene ${contextOrSentence} vector flat white background`
-        : `vector illustration of ${word} white background flat design`;
-        
-    const encodedPrompt = encodeURIComponent(simplePrompt.slice(0, 300)); // Safety limit
+    const encodedPrompt = encodeURIComponent(promptText.slice(0, 300)); 
     const seed = Math.floor(Math.random() * 1000); 
-    return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&seed=${seed}`;
+    return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=600&nologo=true&seed=${seed}`;
   },
   
   /**

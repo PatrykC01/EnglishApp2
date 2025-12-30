@@ -118,7 +118,7 @@ const App: React.FC = () => {
               alert(`Dodano ${newWords.length} słów!`);
           }
       } catch (e) {
-          alert("Błąd generowania. Sprawdź konfigurację API Key.");
+          alert("Błąd generowania. Sprawdź konfigurację API Key lub limity.");
           console.error(e);
       } finally {
           setIsGenerating(false);
@@ -289,28 +289,59 @@ const App: React.FC = () => {
                           <option value="gemini">Google Gemini (Pełna moc)</option>
                       </select>
                   </div>
-                  {settings.aiProvider === 'gemini' && (
-                       <div className="p-3 bg-indigo-50 rounded-lg text-sm text-indigo-700">
-                           API Google Gemini jest aktywne (zmienna środowiskowa).
-                       </div>
-                  )}
 
+                  {/* Model Selection for Gemini */}
+                  {settings.aiProvider === 'gemini' && (
+                      <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">Model Gemini</label>
+                          <div className="flex gap-2">
+                             <button
+                                onClick={() => {
+                                    const newSettings = { ...settings, aiModelType: 'flash' as const };
+                                    setSettings(newSettings);
+                                    storageService.saveSettings(newSettings);
+                                }}
+                                className={`flex-1 py-2 px-3 rounded-md text-sm transition-colors ${
+                                    settings.aiModelType === 'flash' 
+                                    ? 'bg-white border-2 border-indigo-500 text-indigo-700 shadow-sm' 
+                                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                }`}
+                             >
+                                 ⚡ Flash
+                                 <div className="text-[10px] opacity-70">Szybki, większe limity</div>
+                             </button>
+                             <button
+                                onClick={() => {
+                                    const newSettings = { ...settings, aiModelType: 'pro' as const };
+                                    setSettings(newSettings);
+                                    storageService.saveSettings(newSettings);
+                                }}
+                                className={`flex-1 py-2 px-3 rounded-md text-sm transition-colors ${
+                                    settings.aiModelType === 'pro' 
+                                    ? 'bg-white border-2 border-indigo-500 text-indigo-700 shadow-sm' 
+                                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                }`}
+                             >
+                                 🧠 Pro
+                                 <div className="text-[10px] opacity-70">Lepsza jakość, mniejsze limity</div>
+                             </button>
+                          </div>
+                           <div className="mt-2 text-xs text-slate-400">
+                               API Google Gemini jest aktywne. Jeśli wystąpi błąd "429 Quota", przełącz na Flash lub odczekaj chwilę.
+                           </div>
+                      </div>
+                  )}
+                  
                   <hr className="my-4 border-slate-100" />
                   
                   <div>
-                       <label className="block text-sm text-slate-500 mb-1">Klucz API Hugging Face (Obrazy)</label>
-                       <input 
-                         type="password" 
-                         value={settings.huggingFaceApiKey}
-                         placeholder="hf_..."
-                         onChange={(e) => {
-                             const newSettings = { ...settings, huggingFaceApiKey: e.target.value };
-                             setSettings(newSettings);
-                             storageService.saveSettings(newSettings);
-                         }}
-                         className="w-full p-2 border rounded-lg"
-                       />
-                       <p className="text-xs text-slate-400 mt-1">Używany do generowania obrazków, jeśli Gemini zawiedzie.</p>
+                       <h4 className="text-sm font-semibold text-slate-700 mb-2">Generowanie Obrazów</h4>
+                       <p className="text-xs text-slate-500 mb-2">
+                           Domyślnie używa Gemini. Jeśli limit zostanie wyczerpany, automatycznie przełączy się na darmowe Pollinations.ai.
+                       </p>
+                       <div className="p-3 bg-green-50 rounded-lg text-sm text-green-700 border border-green-100">
+                           ✅ Integracja Pollinations.ai aktywna (Brak limitów)
+                       </div>
                    </div>
               </div>
           </div>

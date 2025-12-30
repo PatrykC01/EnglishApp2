@@ -8,10 +8,10 @@ export enum LanguageLevel {
 }
 
 export enum StudyMode {
-  Flashcards = 'flashcards',
-  Typing = 'typing',
-  Match = 'match',
-  Listening = 'listening',
+  flashcards = 'flashcards',
+  typing = 'typing',
+  match = 'match',
+  listening = 'listening',
 }
 
 export enum StudySource {
@@ -46,10 +46,14 @@ export interface Settings {
   userName: string;
   dailyGoal: number;
   level: LanguageLevel;
-  aiProvider: 'gemini' | 'free' | 'pollinations' | 'deepai'; // Added 'deepai'
+  aiProvider: 'gemini' | 'free' | 'pollinations' | 'deepai' | 'perplexity' | 'custom';
   aiModelType: 'flash' | 'pro';
   huggingFaceApiKey: string;
-  deepAiApiKey: string; // New field
+  deepAiApiKey: string;
+  perplexityApiKey: string;
+  customApiKey: string; // New: For subnp.com, Kie-API, etc.
+  customApiBase: string; // New: Base URL
+  customModelName: string; // New: Model name
   enableTTS: boolean;
   enableSoundEffects: boolean;
   preferredStudySource: StudySource;

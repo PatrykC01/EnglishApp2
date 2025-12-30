@@ -3,13 +3,38 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { prompt, apiKey } = req.body;
+  const { prompt, apiKey, provider } = req.body; // Added provider param
 
   if (!apiKey) {
-    return res.status(400).json({ error: 'Missing Hugging Face API Key' });
+    return res.status(400).json({ error: 'Missing API Key' });
   }
 
   try {
+    // --- DEEPAI HANDLER ---
+    if (provider === 'deepai') {
+       // DeepAI requires a FormData-like body usually, but fetch can handle URLSearchParams too for simple text fields
+       const params = new URLSearchParams();
+       params.append('text', prompt);
+       
+       const deepAiResponse = await fetch('https://api.deepai.org/api/text2img', {
+           method: 'POST',
+           headers: {
+               'api-key': apiKey,
+           },
+           body: params
+       });
+
+       if (!deepAiResponse.ok) {
+           const errText = await deepAiResponse.text();
+           return res.status(deepAiResponse.status).json({ error: `DeepAI Error: ${errText}` });
+       }
+
+       const data = await deepAiResponse.json();
+       // DeepAI returns { id: '...', output_url: 'https://...' }
+       return res.status(200).json({ image: data.output_url });
+    }
+
+    // --- HUGGING FACE HANDLER (Default) ---
     // We use Stable Diffusion XL Base 1.0
     const model = "stabilityai/stable-diffusion-xl-base-1.0";
     

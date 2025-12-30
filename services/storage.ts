@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS: Settings = {
   dailyGoal: 10,
   level: LanguageLevel.B1,
   aiProvider: 'free',
+  aiModelType: 'flash',
   huggingFaceApiKey: '',
   enableTTS: true,
   enableSoundEffects: true,

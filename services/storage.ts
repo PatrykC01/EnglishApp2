@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS: Settings = {
   dailyGoal: 10,
   level: LanguageLevel.B1,
   aiProvider: 'free',
+  imageProvider: 'auto',
   aiModelType: 'flash',
   huggingFaceApiKey: '',
   deepAiApiKey: '',
@@ -60,7 +61,9 @@ export const storageService = {
   getSettings: (): Settings => {
     try {
       const data = localStorage.getItem(KEYS.SETTINGS);
-      return data ? { ...DEFAULT_SETTINGS, ...JSON.parse(data) } : DEFAULT_SETTINGS;
+      // Ensure merged settings have all required fields, specifically imageProvider
+      const loadedSettings = data ? JSON.parse(data) : {};
+      return { ...DEFAULT_SETTINGS, ...loadedSettings };
     } catch {
       return DEFAULT_SETTINGS;
     }

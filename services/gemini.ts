@@ -1,10 +1,89 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { Word, LanguageLevel, WordStatus } from "../types";
 import { storageService } from "./storage";
-import { perplexityService } from "./perplexity";
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
+
+// Internal Perplexity Service Implementation to avoid module resolution issues
+const internalPerplexityService = {
+  generateWords: async (
+    category: string,
+    level: LanguageLevel,
+    count: number,
+    existingWords: string[],
+    apiKey: string
+  ): Promise<Word[]> => {
+    if (!apiKey) throw new Error("Missing Perplexity API Key");
+
+    const prompt = `Generate exactly ${count} English vocabulary words related to "${category}" for CEFR level ${level}. 
+    Exclude: ${existingWords.join(", ")}. 
+    Return ONLY a raw JSON array of objects with keys: "english", "polish", "exampleSentence". 
+    Example: [{"english": "reliable", "polish": "niezawodny", "exampleSentence": "He is a reliable employee who never misses a deadline."}]`;
+
+    try {
+      const response = await fetch("https://api.perplexity.ai/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "sonar",
+          messages: [
+            { role: "system", content: "You are a specialized linguistic assistant that only outputs JSON." },
+            { role: "user", content: prompt }
+          ],
+          response_format: { type: "json_schema", json_schema: { name: "vocab", schema: { type: "object", properties: { words: { type: "array", items: { type: "object", properties: { english: { type: "string" }, polish: { type: "string" }, exampleSentence: { type: "string" } }, required: ["english", "polish", "exampleSentence"] } } }, required: ["words"] } } }
+        })
+      });
+
+      const data = await response.json();
+      const content = data.choices[0].message.content;
+      const jsonStr = content.replace(/```json/g, '').replace(/```/g, '').trim();
+      const rawData = JSON.parse(jsonStr);
+      
+      const wordsToReturn = Array.isArray(rawData) ? rawData : rawData.words || [];
+
+      return wordsToReturn.map((item: any) => ({
+        id: Math.random().toString(36).substr(2, 9),
+        english: item.english,
+        polish: item.polish,
+        category: category,
+        level: level,
+        exampleSentence: item.exampleSentence,
+        status: WordStatus.New,
+        nextReview: Date.now(),
+        lastReview: null,
+        attempts: 0,
+        correct: 0,
+        aiGenerated: true
+      }));
+    } catch (error) {
+      console.error("Perplexity Error:", error);
+      throw error;
+    }
+  },
+
+  translateWord: async (word: string, from: 'pl' | 'en', apiKey: string) => {
+    const target = from === 'pl' ? 'English' : 'Polish';
+    const prompt = `Translate "${word}" to ${target} and provide one example English sentence. Return JSON: {"translation": "...", "exampleSentence": "..."}`;
+
+    const response = await fetch("https://api.perplexity.ai/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "sonar",
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+      const data = await response.json();
+      const content = data.choices[0].message.content;
+      return JSON.parse(content.replace(/```json/g, '').replace(/```/g, '').trim());
+  }
+};
 
 export const geminiService = {
   /**
@@ -55,11 +134,10 @@ export const geminiService = {
     }
 
     if (settings.aiProvider === 'perplexity') {
-        return perplexityService.generateWords(category, level, count, existingWords, settings.perplexityApiKey);
+        return internalPerplexityService.generateWords(category, level, count, existingWords, settings.perplexityApiKey);
     }
 
-    // Fix: Using process.env.API_KEY directly in GoogleGenAI constructor
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
     const modelName = settings.aiModelType === 'pro' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
 
     const prompt = `Generate ${count} English vocabulary words related to "${category}" for CEFR level ${level}. 
@@ -121,11 +199,10 @@ export const geminiService = {
       }
 
       if (settings.aiProvider === 'perplexity') {
-          return perplexityService.translateWord(inputWord, inputLang, settings.perplexityApiKey);
+          return internalPerplexityService.translateWord(inputWord, inputLang, settings.perplexityApiKey);
       }
 
-      // Fix: Using process.env.API_KEY directly in GoogleGenAI constructor
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
       const response = await ai.models.generateContent({
           model: "gemini-3-flash-preview",
           contents: prompt,
@@ -140,19 +217,35 @@ export const geminiService = {
         ? `minimalist illustration of ${word}, scene: ${contextOrSentence}, white background, flat vector design`
         : `minimalist vector illustration of ${word}, white background, flat design`;
 
-    // 0. Attempt Custom Image Gen if URL seems to support it
-    if (settings.aiProvider === 'custom' && settings.customApiBase.includes('images')) {
+    // 0. Attempt Custom Image Gen (compatible with subnp/OpenAI proxies)
+    if (settings.aiProvider === 'custom') {
         try {
             const baseUrl = settings.customApiBase.endsWith('/') ? settings.customApiBase.slice(0, -1) : settings.customApiBase;
+            
+            // Smartly select image model: use configured one if it looks like DALL-E, otherwise default to dall-e-3
+            const imageModel = (settings.customModelName && settings.customModelName.toLowerCase().includes('dall-e')) 
+                ? settings.customModelName 
+                : 'dall-e-3';
+
             const response = await fetch(`${baseUrl}/images/generations`, {
                 method: "POST",
                 headers: { "Authorization": `Bearer ${settings.customApiKey}`, "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt: promptText, model: settings.customModelName || "dall-e-3" })
+                body: JSON.stringify({ 
+                    prompt: promptText, 
+                    model: imageModel,
+                    n: 1,
+                    size: "1024x1024"
+                })
             });
-            const data = await response.json();
-            if (data.data?.[0]?.url) return data.data[0].url;
-            if (data.data?.[0]?.b64_json) return `data:image/png;base64,${data.data[0].b64_json}`;
-        } catch (e) { console.warn("Custom Image API failed", e); }
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.data?.[0]?.url) return data.data[0].url;
+                if (data.data?.[0]?.b64_json) return `data:image/png;base64,${data.data[0].b64_json}`;
+            }
+        } catch (e) { 
+            console.warn("Custom Image API failed, falling back to Pollinations", e); 
+        }
     }
 
     // 1. DeepAI
@@ -170,17 +263,10 @@ export const geminiService = {
         } catch (e) { console.warn("DeepAI failed", e); }
     }
 
-    // 2. Pollinations (Standard free fallback)
-    if (settings.aiProvider === 'pollinations' || settings.aiProvider === 'free' || settings.aiProvider === 'perplexity' || settings.aiProvider === 'custom') {
-        const seed = Math.floor(Math.random() * 10000);
-        return `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?width=800&height=600&nologo=true&seed=${seed}`;
-    }
-
-    // 3. Gemini Image
+    // 2. Gemini Image
     if (settings.aiProvider === 'gemini') {
       try {
-        // Fix: Using process.env.API_KEY directly in GoogleGenAI constructor
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
         const modelName = settings.aiModelType === 'pro' ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
         const response = await ai.models.generateContent({
           model: modelName,
@@ -195,7 +281,9 @@ export const geminiService = {
       } catch (e) { console.warn("Gemini Image failed", e); }
     }
 
-    return `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?width=800&height=600&nologo=true&seed=${Math.random()}`;
+    // 3. Pollinations (Standard free fallback)
+    const seed = Math.floor(Math.random() * 10000);
+    return `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?width=800&height=600&nologo=true&seed=${seed}`;
   },
   
   checkTranslation: async (polishWord: string, userEnglishInput: string): Promise<{ isCorrect: boolean; feedback: string }> => {
@@ -211,18 +299,20 @@ export const geminiService = {
 
      if (settings.aiProvider === 'perplexity' && settings.perplexityApiKey) {
          try {
-             const response = await fetch("https://api.perplexity.ai/chat/completions", {
+             return await internalPerplexityService.translateWord(`${polishWord} -> ${userEnglishInput} check`, 'pl', settings.perplexityApiKey); // Re-using translate for simple check logic proxy
+         } catch(e) {
+             // Fallback to fetch for check
+              const response = await fetch("https://api.perplexity.ai/chat/completions", {
                 method: "POST",
                 headers: { "Authorization": `Bearer ${settings.perplexityApiKey}`, "Content-Type": "application/json" },
                 body: JSON.stringify({ model: "sonar", messages: [{ role: "user", content: prompt }] })
              });
              const data = await response.json();
              return JSON.parse(data.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim());
-         } catch (e) { return { isCorrect: false, feedback: "Błąd Perplexity" }; }
+         }
      }
 
-     // Fix: Using process.env.API_KEY directly in GoogleGenAI constructor
-     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
      try {
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",

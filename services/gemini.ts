@@ -66,7 +66,10 @@ const internalPerplexityService = {
 
   translateWord: async (word: string, from: 'pl' | 'en', apiKey: string) => {
     const target = from === 'pl' ? 'English' : 'Polish';
-    const prompt = `Translate "${word}" to ${target} and provide one example English sentence. Return JSON: {"translation": "...", "exampleSentence": "..."}`;
+    // STRICT PROMPT: Ensure example sentence is ALWAYS in English
+    const prompt = `Translate "${word}" to ${target}. Also provide one simple example sentence using the English word. 
+    IMPORTANT: The 'exampleSentence' MUST be in English, even if translating to Polish.
+    Return JSON: {"translation": "...", "exampleSentence": "..."}`;
 
     const response = await fetch("https://api.perplexity.ai/chat/completions", {
         method: "POST",
@@ -191,7 +194,11 @@ export const geminiService = {
 
   translateWord: async (inputWord: string, inputLang: 'pl' | 'en'): Promise<{ translation: string; exampleSentence: string }> => {
       const settings = storageService.getSettings();
-      const prompt = `Translate "${inputWord}" from ${inputLang === 'pl' ? 'Polish' : 'English'} to ${inputLang === 'pl' ? 'English' : 'Polish'}. Provide one example sentence. Return JSON: {"translation": "...", "exampleSentence": "..."}`;
+      // STRICT PROMPT: Force English example sentence
+      const prompt = `Translate "${inputWord}" from ${inputLang === 'pl' ? 'Polish' : 'English'} to ${inputLang === 'pl' ? 'English' : 'Polish'}. 
+      Provide one simple example sentence using the English version of the word.
+      IMPORTANT: The 'exampleSentence' MUST be in ENGLISH.
+      Return JSON: {"translation": "...", "exampleSentence": "..."}`;
 
       if (settings.aiProvider === 'custom') {
           const content = await geminiService.fetchCustomAI(prompt);
@@ -211,18 +218,56 @@ export const geminiService = {
       return JSON.parse(response.text || '{}');
   },
 
+  // NEW METHOD: Generate only example sentence
+  generateExampleSentence: async (englishWord: string): Promise<string> => {
+      const settings = storageService.getSettings();
+      const prompt = `Generate one short, simple English example sentence using the word "${englishWord}". 
+      Return JSON: {"exampleSentence": "..."}`;
+
+      if (settings.aiProvider === 'custom') {
+          try {
+            const content = await geminiService.fetchCustomAI(prompt);
+            const res = JSON.parse(content.replace(/```json/g, '').replace(/```/g, '').trim());
+            return res.exampleSentence;
+          } catch { return ""; }
+      }
+
+      // Fallback/Standard logic
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      try {
+        const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: prompt,
+            config: { responseMimeType: "application/json" }
+        });
+        const res = JSON.parse(response.text || '{}');
+        return res.exampleSentence || "";
+      } catch { return ""; }
+  },
+
   generateImage: async (word: string, contextOrSentence?: string): Promise<string> => {
     const settings = storageService.getSettings();
     const promptText = contextOrSentence 
         ? `minimalist illustration of ${word}, scene: ${contextOrSentence}, white background, flat vector design`
         : `minimalist vector illustration of ${word}, white background, flat design`;
 
-    // ---------------------------------------------------------
-    // STRATEGY: Try Preferred -> Try Fallbacks (HF) -> Last Resort (Pollinations)
-    // ---------------------------------------------------------
+    // Helper to get Pollinations URL
+    const getPollinationsUrl = () => {
+        const seed = Math.floor(Math.random() * 10000);
+        return `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?width=800&height=600&nologo=true&seed=${seed}`;
+    };
 
-    // 1. Try Custom Provider (if configured)
-    if (settings.aiProvider === 'custom') {
+    // Determine strategy based on imageProvider setting
+    let strategy = settings.imageProvider || 'auto'; // Default to auto
+
+    // 1. Forced Strategy: Pollinations
+    if (strategy === 'pollinations') {
+        return getPollinationsUrl();
+    }
+
+    // 2. Forced Strategy: Custom (subnp/DALL-E)
+    if (strategy === 'custom') {
+        if (!settings.customApiKey) return getPollinationsUrl(); // Fallback
         try {
             const baseUrl = settings.customApiBase.endsWith('/') ? settings.customApiBase.slice(0, -1) : settings.customApiBase;
             const imageModel = (settings.customModelName && settings.customModelName.toLowerCase().includes('dall-e')) 
@@ -239,11 +284,37 @@ export const geminiService = {
                 if (data.data?.[0]?.url) return data.data[0].url;
                 if (data.data?.[0]?.b64_json) return `data:image/png;base64,${data.data[0].b64_json}`;
             }
-        } catch (e) { console.warn("Custom Image API failed", e); }
+            throw new Error("Custom Image API Error");
+        } catch (e) {
+            console.warn("Custom Image failed, falling back to Pollinations", e);
+            return getPollinationsUrl();
+        }
     }
 
-    // 2. Try DeepAI (only if specifically selected)
-    if (settings.aiProvider === 'deepai' && settings.deepAiApiKey) {
+    // 3. Forced Strategy: Gemini
+    if (strategy === 'gemini') {
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+            const modelName = settings.aiModelType === 'pro' ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
+            const response = await ai.models.generateContent({
+              model: modelName,
+              contents: promptText,
+            });
+            const parts = response.candidates?.[0]?.content?.parts;
+            if (parts) {
+                for (const part of parts) {
+                    if (part.inlineData) return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                }
+            }
+            throw new Error("No image data in Gemini response");
+        } catch (e) {
+            console.warn("Gemini Image failed, falling back to Pollinations", e);
+            return getPollinationsUrl();
+        }
+    }
+    
+    // 4. Forced Strategy: DeepAI
+    if (strategy === 'deepai') {
         try {
             const response = await fetch('/api/generate-image', {
                 method: 'POST',
@@ -255,48 +326,21 @@ export const geminiService = {
                 if (data.image) return data.image;
             }
         } catch (e) { console.warn("DeepAI failed", e); }
+        return getPollinationsUrl();
     }
-
-    // 3. Try Gemini (if selected)
-    if (settings.aiProvider === 'gemini') {
-      try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-        const modelName = settings.aiModelType === 'pro' ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
-        const response = await ai.models.generateContent({
-          model: modelName,
-          contents: promptText,
-        });
-        const parts = response.candidates?.[0]?.content?.parts;
-        if (parts) {
-            for (const part of parts) {
-                if (part.inlineData) return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-            }
-        }
-      } catch (e) { console.warn("Gemini Image failed", e); }
-    }
-
-    // ---------------------------------------------------------
-    // FALLBACKS (If Primary Failed)
-    // ---------------------------------------------------------
-
-    // 4. Fallback: Hugging Face (Check if Key exists, regardless of selected provider)
-    if (settings.huggingFaceApiKey) {
+    
+    // 5. Forced Strategy: Hugging Face
+    if (strategy === 'huggingface') {
+        if (!settings.huggingFaceApiKey) return getPollinationsUrl();
         try {
-            // Direct client-side call to standard HF Inference API (SDXL)
-            // Using stabilityai/stable-diffusion-xl-base-1.0
             const response = await fetch(
                 "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0",
                 {
                     method: "POST",
-                    headers: {
-                        "Authorization": `Bearer ${settings.huggingFaceApiKey}`,
-                        "Content-Type": "application/json",
-                        "x-use-cache": "false"
-                    },
+                    headers: { "Authorization": `Bearer ${settings.huggingFaceApiKey}`, "Content-Type": "application/json", "x-use-cache": "false" },
                     body: JSON.stringify({ inputs: promptText }),
                 }
             );
-
             if (response.ok) {
                 const blob = await response.blob();
                 return await new Promise((resolve, reject) => {
@@ -305,15 +349,13 @@ export const geminiService = {
                     reader.onerror = reject;
                     reader.readAsDataURL(blob);
                 });
-            } else {
-                console.warn("HF Fallback returned error:", await response.text());
             }
-        } catch (e) { console.warn("HF Fallback failed", e); }
+        } catch (e) { console.warn("HF failed", e); }
+        return getPollinationsUrl();
     }
 
-    // 5. Last Resort: Pollinations (Free, Anonymous, but Rate Limited)
-    const seed = Math.floor(Math.random() * 10000);
-    return `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?width=800&height=600&nologo=true&seed=${seed}`;
+    // E. Fallback
+    return getPollinationsUrl();
   },
   
   checkTranslation: async (polishWord: string, userEnglishInput: string): Promise<{ isCorrect: boolean; feedback: string }> => {

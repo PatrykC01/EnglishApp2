@@ -238,7 +238,7 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
                 <button onClick={onExit} className="text-slate-400">✕</button>
                 <span>{currentIndex + 1} / {words.length}</span>
             </div>
-            {currentImage && <img src={currentImage} className="w-32 h-32 mx-auto rounded-lg object-contain mb-4 shadow-sm" alt="hint" />}
+            {currentImage && <img src={currentImage} className="w-32 h-32 mx-auto rounded-lg object-cover mb-4 shadow-sm" alt="hint" />}
             <h2 className="text-3xl font-bold text-center mb-2">{currentWord.polish}</h2>
             <p className="text-center text-slate-400 text-sm">Przetłumacz na angielski</p>
          </div>

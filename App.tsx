@@ -254,9 +254,11 @@ const App: React.FC = () => {
                          </div>
                          <div>
                             <label className="text-[10px] uppercase text-amber-600 font-bold block mb-1">Model (Tekst/Obraz)</label>
-                            <input type="text" value={settings.customModelName} placeholder="np. gpt-4o lub flux-1" onChange={(e) => { const newS = { ...settings, customModelName: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-white text-sm" />
+                            <input type="text" value={settings.customModelName} placeholder="np. gpt-4o" onChange={(e) => { const newS = { ...settings, customModelName: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-white text-sm" />
                          </div>
-                         <p className="text-[10px] text-amber-700 italic">Uwaga: Endpoint powinien być zgodny ze standardem OpenAI (/chat/completions).</p>
+                         <p className="text-[10px] text-amber-700 italic">
+                             Wsparcie dla proxy (np. subnp.com). Dla obrazów automatycznie użyjemy endpointu /images/generations (DALL-E 3).
+                         </p>
                     </div>
                   )}
 

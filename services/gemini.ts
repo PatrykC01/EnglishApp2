@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { Word, LanguageLevel, WordStatus } from "../types";
+import { Word, LanguageLevel, WordStatus, Settings } from "../types";
 import { storageService } from "./storage";
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -144,7 +144,7 @@ export const geminiService = {
     count: number,
     existingWords: string[]
   ): Promise<Word[]> => {
-    const settings = storageService.getSettings();
+    const settings: Settings = storageService.getSettings();
     
     // Route to Custom API if selected
     if (settings.aiProvider === 'custom') {
@@ -216,7 +216,7 @@ export const geminiService = {
   },
 
   translateWord: async (inputWord: string, inputLang: 'pl' | 'en'): Promise<{ translation: string; exampleSentence: string }> => {
-      const settings = storageService.getSettings();
+      const settings: Settings = storageService.getSettings();
       // STRICT PROMPT: Force English example sentence
       const prompt = `Translate "${inputWord}" from ${inputLang === 'pl' ? 'Polish' : 'English'} to ${inputLang === 'pl' ? 'English' : 'Polish'}. 
       Provide one simple example sentence using the English version of the word.
@@ -243,7 +243,7 @@ export const geminiService = {
 
   // NEW METHOD: Generate only example sentence
   generateExampleSentence: async (englishWord: string): Promise<string> => {
-      const settings = storageService.getSettings();
+      const settings: Settings = storageService.getSettings();
       const prompt = `Generate one short, simple English example sentence using the word "${englishWord}". 
       Return JSON: {"exampleSentence": "..."}`;
 
@@ -273,7 +273,7 @@ export const geminiService = {
   },
 
   generateImage: async (word: string, contextOrSentence?: string): Promise<string> => {
-    const settings = storageService.getSettings();
+    const settings: Settings = storageService.getSettings();
     const promptText = contextOrSentence 
         ? `minimalist illustration of ${word}, scene: ${contextOrSentence}, white background, flat vector design`
         : `minimalist vector illustration of ${word}, white background, flat design`;
@@ -386,7 +386,7 @@ export const geminiService = {
   },
   
   checkTranslation: async (polishWord: string, userEnglishInput: string): Promise<{ isCorrect: boolean; feedback: string }> => {
-     const settings = storageService.getSettings();
+     const settings: Settings = storageService.getSettings();
      const prompt = `The user translates "${polishWord}" as "${userEnglishInput}". Is it correct? Return JSON: {"isCorrect": boolean, "feedback": "Short feedback in Polish"}`;
      
      if (settings.aiProvider === 'custom') {

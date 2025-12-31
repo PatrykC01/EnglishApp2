@@ -47,13 +47,14 @@ export interface Settings {
   dailyGoal: number;
   level: LanguageLevel;
   aiProvider: 'gemini' | 'free' | 'pollinations' | 'deepai' | 'perplexity' | 'custom';
+  imageProvider: 'auto' | 'pollinations' | 'custom' | 'gemini' | 'deepai' | 'huggingface';
   aiModelType: 'flash' | 'pro';
   huggingFaceApiKey: string;
   deepAiApiKey: string;
   perplexityApiKey: string;
-  customApiKey: string; // New: For subnp.com, Kie-API, etc.
-  customApiBase: string; // New: Base URL
-  customModelName: string; // New: Model name
+  customApiKey: string;
+  customApiBase: string;
+  customModelName: string;
   enableTTS: boolean;
   enableSoundEffects: boolean;
   preferredStudySource: StudySource;

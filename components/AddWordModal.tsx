@@ -35,17 +35,21 @@ const AddWordModal: React.FC<AddWordModalProps> = ({ isOpen, onClose, onSave, cu
     let finalExample = '';
 
     try {
-        // Logic: If one is missing, ask AI to fill it
+        // Case 1: Only Polish -> Translate to EN & Generate Sentence
         if (!finalEnglish && finalPolish) {
-            // Translate PL -> EN
             const result = await geminiService.translateWord(finalPolish, 'pl');
             finalEnglish = result.translation;
             finalExample = result.exampleSentence;
-        } else if (!finalPolish && finalEnglish) {
-            // Translate EN -> PL
+        } 
+        // Case 2: Only English -> Translate to PL & Generate Sentence
+        else if (!finalPolish && finalEnglish) {
             const result = await geminiService.translateWord(finalEnglish, 'en');
             finalPolish = result.translation;
             finalExample = result.exampleSentence;
+        } 
+        // Case 3: Both provided -> Generate ONLY the Example Sentence
+        else if (finalPolish && finalEnglish) {
+            finalExample = await geminiService.generateExampleSentence(finalEnglish);
         }
 
         // Create the word object
@@ -84,7 +88,7 @@ const AddWordModal: React.FC<AddWordModalProps> = ({ isOpen, onClose, onSave, cu
         <div className="p-6">
             <h2 className="text-2xl font-bold text-slate-800 mb-2">Dodaj nowe słowo</h2>
             <p className="text-sm text-slate-500 mb-6">
-                Wpisz słowo po polsku LUB po angielsku. AI automatycznie uzupełni brakujące tłumaczenie!
+                Wpisz słowo po polsku LUB po angielsku (AI przetłumaczy). Jeśli wpiszesz oba, AI doda zdanie przykładowe!
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">

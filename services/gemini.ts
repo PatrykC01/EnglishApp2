@@ -217,25 +217,21 @@ export const geminiService = {
         ? `minimalist illustration of ${word}, scene: ${contextOrSentence}, white background, flat vector design`
         : `minimalist vector illustration of ${word}, white background, flat design`;
 
-    // 0. Attempt Custom Image Gen (compatible with subnp/OpenAI proxies)
+    // ---------------------------------------------------------
+    // STRATEGY: Try Preferred -> Try Fallbacks (HF) -> Last Resort (Pollinations)
+    // ---------------------------------------------------------
+
+    // 1. Try Custom Provider (if configured)
     if (settings.aiProvider === 'custom') {
         try {
             const baseUrl = settings.customApiBase.endsWith('/') ? settings.customApiBase.slice(0, -1) : settings.customApiBase;
-            
-            // Smartly select image model: use configured one if it looks like DALL-E, otherwise default to dall-e-3
             const imageModel = (settings.customModelName && settings.customModelName.toLowerCase().includes('dall-e')) 
-                ? settings.customModelName 
-                : 'dall-e-3';
+                ? settings.customModelName : 'dall-e-3';
 
             const response = await fetch(`${baseUrl}/images/generations`, {
                 method: "POST",
                 headers: { "Authorization": `Bearer ${settings.customApiKey}`, "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                    prompt: promptText, 
-                    model: imageModel,
-                    n: 1,
-                    size: "1024x1024"
-                })
+                body: JSON.stringify({ prompt: promptText, model: imageModel, n: 1, size: "1024x1024" })
             });
             
             if (response.ok) {
@@ -243,12 +239,10 @@ export const geminiService = {
                 if (data.data?.[0]?.url) return data.data[0].url;
                 if (data.data?.[0]?.b64_json) return `data:image/png;base64,${data.data[0].b64_json}`;
             }
-        } catch (e) { 
-            console.warn("Custom Image API failed, falling back to Pollinations", e); 
-        }
+        } catch (e) { console.warn("Custom Image API failed", e); }
     }
 
-    // 1. DeepAI
+    // 2. Try DeepAI (only if specifically selected)
     if (settings.aiProvider === 'deepai' && settings.deepAiApiKey) {
         try {
             const response = await fetch('/api/generate-image', {
@@ -263,7 +257,7 @@ export const geminiService = {
         } catch (e) { console.warn("DeepAI failed", e); }
     }
 
-    // 2. Gemini Image
+    // 3. Try Gemini (if selected)
     if (settings.aiProvider === 'gemini') {
       try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
@@ -281,7 +275,43 @@ export const geminiService = {
       } catch (e) { console.warn("Gemini Image failed", e); }
     }
 
-    // 3. Pollinations (Standard free fallback)
+    // ---------------------------------------------------------
+    // FALLBACKS (If Primary Failed)
+    // ---------------------------------------------------------
+
+    // 4. Fallback: Hugging Face (Check if Key exists, regardless of selected provider)
+    if (settings.huggingFaceApiKey) {
+        try {
+            // Direct client-side call to standard HF Inference API (SDXL)
+            // Using stabilityai/stable-diffusion-xl-base-1.0
+            const response = await fetch(
+                "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0",
+                {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${settings.huggingFaceApiKey}`,
+                        "Content-Type": "application/json",
+                        "x-use-cache": "false"
+                    },
+                    body: JSON.stringify({ inputs: promptText }),
+                }
+            );
+
+            if (response.ok) {
+                const blob = await response.blob();
+                return await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+            } else {
+                console.warn("HF Fallback returned error:", await response.text());
+            }
+        } catch (e) { console.warn("HF Fallback failed", e); }
+    }
+
+    // 5. Last Resort: Pollinations (Free, Anonymous, but Rate Limited)
     const seed = Math.floor(Math.random() * 10000);
     return `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?width=800&height=600&nologo=true&seed=${seed}`;
   },
@@ -299,9 +329,8 @@ export const geminiService = {
 
      if (settings.aiProvider === 'perplexity' && settings.perplexityApiKey) {
          try {
-             return await internalPerplexityService.translateWord(`${polishWord} -> ${userEnglishInput} check`, 'pl', settings.perplexityApiKey); // Re-using translate for simple check logic proxy
+             return await internalPerplexityService.translateWord(`${polishWord} -> ${userEnglishInput} check`, 'pl', settings.perplexityApiKey); 
          } catch(e) {
-             // Fallback to fetch for check
               const response = await fetch("https://api.perplexity.ai/chat/completions", {
                 method: "POST",
                 headers: { "Authorization": `Bearer ${settings.perplexityApiKey}`, "Content-Type": "application/json" },

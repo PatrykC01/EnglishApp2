@@ -85,6 +85,29 @@ const internalPerplexityService = {
       const data = await response.json();
       const content = data.choices[0].message.content;
       return JSON.parse(content.replace(/```json/g, '').replace(/```/g, '').trim());
+  },
+
+  generateExampleSentence: async (englishWord: string, apiKey: string) => {
+      const prompt = `Generate one short, simple English example sentence using the word "${englishWord}". 
+      Return JSON: {"exampleSentence": "..."}`;
+
+      try {
+          const response = await fetch("https://api.perplexity.ai/chat/completions", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: "sonar",
+              messages: [{ role: "user", content: prompt }]
+            })
+          });
+          const data = await response.json();
+          const content = data.choices[0].message.content;
+          const res = JSON.parse(content.replace(/```json/g, '').replace(/```/g, '').trim());
+          return res.exampleSentence;
+      } catch (e) {
+          console.error("Perplexity Sentence Error", e);
+          return "";
+      }
   }
 };
 
@@ -232,7 +255,11 @@ export const geminiService = {
           } catch { return ""; }
       }
 
-      // Fallback/Standard logic
+      if (settings.aiProvider === 'perplexity') {
+          return internalPerplexityService.generateExampleSentence(englishWord, settings.perplexityApiKey);
+      }
+
+      // Fallback/Standard logic (Gemini)
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
       try {
         const response = await ai.models.generateContent({

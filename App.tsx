@@ -161,7 +161,7 @@ const App: React.FC = () => {
   }
 
   const renderDashboard = () => (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-32 md:pb-0">
        <header className="mb-8 flex justify-between items-center">
            <div>
              <h2 className="text-3xl font-bold text-slate-800">Cześć, {settings.userName}! 👋</h2>
@@ -263,7 +263,7 @@ const App: React.FC = () => {
       });
 
       return (
-      <div className="space-y-4">
+      <div className="space-y-4 pb-32 md:pb-0">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
             <h2 className="text-2xl font-bold">Baza Słów ({filteredList.length})</h2>
             <div className="flex gap-2 w-full md:w-auto">
@@ -286,7 +286,7 @@ const App: React.FC = () => {
   )};
 
   const renderSettings = () => (
-      <div className="space-y-6 max-w-lg pb-10">
+      <div className="space-y-6 max-w-lg pb-32 md:pb-10">
           <h2 className="text-2xl font-bold">Ustawienia</h2>
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
               <h3 className="font-bold mb-4 text-slate-700">Silniki AI</h3>

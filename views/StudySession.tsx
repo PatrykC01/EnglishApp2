@@ -153,7 +153,12 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
           } else {
               // No Match
               // Record mistake
-              setMatchMistakes(prev => new Set(prev).add(selected.wordId).add(clickedCard.wordId));
+              setMatchMistakes(prev => {
+                  const newSet = new Set(prev);
+                  newSet.add(selected.wordId);
+                  newSet.add(clickedCard.wordId);
+                  return newSet;
+              });
 
               // Show Error State
               setMatchCards(prev => prev.map(c => 
@@ -176,18 +181,28 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
   // Fix: Updated StudyMode.Flashcards to StudyMode.flashcards
   if (mode === StudyMode.flashcards) {
     return (
-      <div className="flex flex-col items-center h-full justify-center">
-        <div className="w-full flex justify-between items-center mb-6 px-4">
-             <button onClick={onExit} className="text-slate-400 hover:text-slate-600">✕ Zakończ</button>
-             <div className="text-slate-500 font-medium">{currentIndex + 1} / {words.length}</div>
+      <div className="flex flex-col h-full bg-slate-50 relative">
+        {/* Header - Fixed Top */}
+        <div className="w-full flex justify-between items-center p-4 z-10">
+             <button onClick={onExit} className="text-slate-400 hover:text-slate-600 flex items-center gap-1">
+               <span className="text-xl">✕</span> Zakończ
+             </button>
+             <div className="bg-white px-4 py-1 rounded-full text-slate-500 font-medium shadow-sm border border-slate-100">
+               {currentIndex + 1} / {words.length}
+             </div>
         </div>
-        <Flashcard 
-            word={currentWord} 
-            onResult={handleNext} 
-            imageUrl={currentImage}
-            onRegenerateImage={handleRegenerateImage}
-        />
-        <p className="mt-8 text-xs text-slate-400">Przesuń w prawo jeśli umiesz, w lewo jeśli nie.</p>
+        
+        {/* Card Container - Centered in remaining space */}
+        <div className="flex-1 flex flex-col items-center justify-center relative w-full">
+            <Flashcard 
+                word={currentWord} 
+                onResult={handleNext} 
+                imageUrl={currentImage}
+                onRegenerateImage={handleRegenerateImage}
+            />
+             {/* MODIFIED: Hidden on mobile to avoid overlap */}
+             <p className="mt-8 text-xs text-slate-400 hidden md:block">Przesuń w prawo jeśli umiesz, w lewo jeśli nie.</p>
+        </div>
       </div>
     );
   }

@@ -376,19 +376,23 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
 
   if (mode === StudyMode.match) {
       return (
-          <div className="flex flex-col items-center h-full pt-4 md:pt-10 px-2">
+          // Added overflow-y-auto and pb-32 to fix scrolling and navbar obstruction on mobile
+          <div className="flex flex-col items-center w-full h-full overflow-y-auto pt-4 md:pt-10 px-2 pb-32">
               <div className="w-full max-w-3xl flex justify-between items-center mb-6 px-2"><button onClick={onExit} className="text-slate-400 hover:text-slate-600">✕ Zakończ</button><div className="text-indigo-600 font-bold">Dopasuj pary</div></div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-3xl pb-10">
-                  {matchCards.map((card) => (
-                      <button
-                          key={card.id}
-                          onClick={() => handleCardClick(card)}
-                          disabled={card.state === 'matched'}
-                          className={`h-24 md:h-32 rounded-xl text-lg font-medium p-2 shadow-sm border-2 transition-all transform duration-200 flex items-center justify-center text-center break-words ${card.state === 'default' ? 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 hover:-translate-y-1' : ''} ${card.state === 'selected' ? 'bg-indigo-600 border-indigo-600 text-white scale-105 shadow-md' : ''} ${card.state === 'matched' ? 'bg-green-100 border-green-200 text-green-400 opacity-50 scale-95' : ''} ${card.state === 'wrong' ? 'bg-red-100 border-red-400 text-red-700 animate-pulse' : ''}`}
-                      >
-                          {card.text}
-                      </button>
-                  ))}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-3xl">
+                  {matchCards.map((card) => {
+                      // Hiding matched cards to save screen space on mobile
+                      if (card.state === 'matched') return null;
+                      return (
+                          <button
+                              key={card.id}
+                              onClick={() => handleCardClick(card)}
+                              className={`h-24 md:h-32 rounded-xl text-lg font-medium p-2 shadow-sm border-2 transition-all transform duration-200 flex items-center justify-center text-center break-words ${card.state === 'default' ? 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 hover:-translate-y-1' : ''} ${card.state === 'selected' ? 'bg-indigo-600 border-indigo-600 text-white scale-105 shadow-md' : ''} ${card.state === 'wrong' ? 'bg-red-100 border-red-400 text-red-700 animate-pulse' : ''}`}
+                          >
+                              {card.text}
+                          </button>
+                      );
+                  })}
               </div>
           </div>
       );

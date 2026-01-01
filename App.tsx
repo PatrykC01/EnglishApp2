@@ -120,9 +120,11 @@ const App: React.FC = () => {
               storageService.saveWords(merged);
               updateStats(merged);
           }
-      } catch (e) {
-          alert("Błąd generowania. Sprawdź konfigurację API w Ustawieniach.");
-          console.error(e);
+      } catch (e: any) {
+          // Show detailed error message for debugging on mobile
+          const errorMessage = e?.message || JSON.stringify(e) || "Nieznany błąd";
+          alert(`Błąd generowania: ${errorMessage}. Sprawdź konfigurację API i połączenie internetowe.`);
+          console.error("Generowanie błąd:", e);
       } finally {
           setIsGenerating(false);
       }

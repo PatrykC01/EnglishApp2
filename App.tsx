@@ -302,6 +302,27 @@ const App: React.FC = () => {
                           <option value="free">Tryb podstawowy (Offline)</option>
                       </select>
                   </div>
+
+                  {settings.aiProvider === 'gemini' && (
+                    <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                        <label className="block text-xs font-bold text-blue-900 mb-1">Model Gemini (Limit / Szybkość)</label>
+                        <select
+                            value={settings.aiModelType}
+                            onChange={(e) => {
+                                const newS = { ...settings, aiModelType: e.target.value as 'flash' | 'pro' };
+                                setSettings(newS);
+                                storageService.saveSettings(newS);
+                            }}
+                            className="w-full p-2 border border-blue-200 rounded-lg bg-white text-sm"
+                        >
+                            <option value="flash">Gemini Flash (Szybki, domyślny)</option>
+                            <option value="pro">Gemini Pro (Większy limit, mądrzejszy)</option>
+                        </select>
+                        <p className="text-[10px] text-blue-600 mt-1 leading-tight">
+                            Jeśli otrzymujesz błąd "Quota exceeded", zmień model na drugi. Flash i Pro mają oddzielne limity w Google AI Studio.
+                        </p>
+                    </div>
+                  )}
                   
                   <div>
                       <label className="block text-sm text-slate-500 mb-1">Generator Obrazów (Fiszki)</label>

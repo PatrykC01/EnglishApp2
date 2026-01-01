@@ -181,7 +181,7 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
   // Fix: Updated StudyMode.Flashcards to StudyMode.flashcards
   if (mode === StudyMode.flashcards) {
     return (
-      <div className="flex flex-col h-full bg-slate-50 relative">
+      <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden">
         {/* Header - Fixed Top */}
         <div className="w-full flex justify-between items-center p-4 z-10">
              <button onClick={onExit} className="text-slate-400 hover:text-slate-600 flex items-center gap-1">

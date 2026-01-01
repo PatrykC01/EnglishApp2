@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Word } from '../types';
 
 interface FlashcardProps {
@@ -11,19 +11,67 @@ interface FlashcardProps {
 const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegenerateImage }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [dragX, setDragX] = useState(0);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const [exitX, setExitX] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   
-  // Touch/Mouse handlers for simple swipe logic
+  // Ref to track drag value inside event closures
+  const xRef = useRef(0);
+  
+  // Reset state when word changes
+  useEffect(() => {
+    setIsFlipped(false);
+    setDragX(0);
+    xRef.current = 0;
+    setExitX(null);
+    setIsDragging(false);
+  }, [word]);
+
+  const triggerResult = (correct: boolean) => {
+      // Prevent multiple triggers
+      if (exitX !== null) return;
+
+      // Animate out (Fly away)
+      const flyValue = correct ? window.innerWidth : -window.innerWidth;
+      setExitX(flyValue);
+      
+      // Wait for animation then call callback
+      setTimeout(() => {
+          onResult(correct);
+      }, 300);
+  };
+
+  // Keyboard Navigation
+  useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+          if (exitX !== null || (e.target as HTMLElement).tagName === 'INPUT') return;
+
+          if (e.code === 'Space') {
+              e.preventDefault();
+              setIsFlipped(prev => !prev);
+          } else if (e.code === 'ArrowRight') {
+              triggerResult(true);
+          } else if (e.code === 'ArrowLeft') {
+              triggerResult(false);
+          }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [exitX]);
+
+  // Touch/Mouse handlers
   const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
-    // Only drag if not clicking a button inside the card
     if ((e.target as HTMLElement).closest('button')) return;
 
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    setIsDragging(true);
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
     const startX = clientX;
 
     const handleMove = (moveEvent: TouchEvent | MouseEvent) => {
       const currentX = 'touches' in moveEvent ? (moveEvent as TouchEvent).touches[0].clientX : (moveEvent as MouseEvent).clientX;
-      setDragX(currentX - startX);
+      const val = currentX - startX;
+      xRef.current = val;
+      setDragX(val);
     };
 
     const handleEnd = () => {
@@ -31,13 +79,17 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
       document.removeEventListener('touchend', handleEnd);
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleEnd);
-
-      if (dragX > 100) {
-        onResult(true); // Right swipe = Know
-      } else if (dragX < -100) {
-        onResult(false); // Left swipe = Don't Know
+      
+      setIsDragging(false);
+      
+      if (xRef.current > 100) {
+        triggerResult(true); // Right swipe = Know
+      } else if (xRef.current < -100) {
+        triggerResult(false); // Left swipe = Don't Know
+      } else {
+        setDragX(0); // Snap back
+        xRef.current = 0;
       }
-      setDragX(0);
     };
 
     document.addEventListener('touchmove', handleMove);
@@ -48,32 +100,36 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
 
   // Determine border color based on drag
   let borderColor = 'border-slate-200';
-  let rotate = dragX / 15; // Reduced rotation sensitivity for larger cards
-  if (dragX > 50) borderColor = 'border-green-400';
-  if (dragX < -50) borderColor = 'border-red-400';
+  const effectiveX = exitX !== null ? exitX : dragX;
+  const rotate = effectiveX / 15;
+  
+  if (effectiveX > 50) borderColor = 'border-green-400';
+  if (effectiveX < -50) borderColor = 'border-red-400';
 
   return (
     <div className="perspective-1000 w-full max-w-sm md:max-w-2xl mx-auto h-[480px] md:h-[600px] cursor-pointer relative select-none">
        {/* Instruction Overlay on Drag */}
-       {dragX > 50 && (
+       {effectiveX > 50 && (
          <div className="absolute top-8 right-8 z-50 bg-green-500 text-white px-6 py-2 rounded-full text-lg font-bold shadow-xl animate-pulse">
            ZNAM
          </div>
        )}
-       {dragX < -50 && (
+       {effectiveX < -50 && (
          <div className="absolute top-8 left-8 z-50 bg-red-500 text-white px-6 py-2 rounded-full text-lg font-bold shadow-xl animate-pulse">
            NIE ZNAM
          </div>
        )}
 
       <div
-        ref={cardRef}
         onClick={() => Math.abs(dragX) < 10 && setIsFlipped(!isFlipped)}
         onTouchStart={handleTouchStart}
         onMouseDown={handleTouchStart}
-        className={`relative w-full h-full text-center transition-transform duration-500 transform-style-3d shadow-2xl rounded-3xl bg-white border-[1px] md:border-4 ${borderColor}`}
+        className={`relative w-full h-full text-center transform-style-3d shadow-2xl rounded-3xl bg-white border-[1px] md:border-4 ${borderColor}`}
         style={{
-          transform: `rotateY(${isFlipped ? 180 : 0}deg) translateX(${dragX}px) rotate(${rotate}deg)`,
+          // Apply translation first, then tilt, then flip. 
+          // This ensures that dragging RIGHT always moves the card RIGHT on screen, regardless of flip state.
+          transform: `translateX(${effectiveX}px) rotate(${rotate}deg) rotateY(${isFlipped ? 180 : 0}deg)`,
+          transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
         }}
       >
         {/* Front */}
@@ -81,7 +137,7 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
           <div className="absolute top-6 text-sm md:text-base uppercase tracking-[0.2em] text-slate-400 font-semibold">{word.category}</div>
           <h2 className="text-5xl md:text-7xl font-bold text-slate-800 mb-8">{word.polish}</h2>
           <div className="absolute bottom-8 flex flex-col items-center">
-             <span className="text-xs md:text-sm text-slate-400 font-medium">Kliknij, aby odwrócić</span>
+             <span className="text-xs md:text-sm text-slate-400 font-medium">Kliknij lub SPACJA, aby odwrócić</span>
              <div className="w-12 h-1 bg-slate-200 rounded-full mt-2"></div>
           </div>
         </div>
@@ -94,7 +150,7 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
                 <img 
                     src={imageUrl} 
                     alt={word.english} 
-                    className="w-full h-full object-contain" 
+                    className="w-full h-full object-cover" 
                 />
              ) : (
                 <div className="w-full h-full flex items-center justify-center text-slate-300 bg-slate-50">
@@ -134,7 +190,7 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
       {/* Controls below card */}
       <div className="flex justify-between items-center mt-8 md:mt-10 px-8 md:px-20 max-w-2xl mx-auto w-full">
         <button 
-            onClick={(e) => { e.stopPropagation(); onResult(false); setIsFlipped(false); }}
+            onClick={(e) => { e.stopPropagation(); triggerResult(false); }}
             className="group flex flex-col items-center gap-2 transition-transform hover:scale-105"
         >
             <div className="w-16 h-16 md:w-20 md:h-20 rounded-full border-2 border-red-100 bg-white group-hover:bg-red-50 group-hover:border-red-200 flex items-center justify-center shadow-md text-red-500 text-3xl md:text-4xl transition-colors">
@@ -143,10 +199,12 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
             <span className="text-xs md:text-sm font-bold text-slate-400 group-hover:text-red-500 uppercase tracking-wide">Nie wiem</span>
         </button>
         
-        <div className="text-xs text-slate-300 font-mono hidden md:block">SPACJA = ODWRÓĆ</div>
+        <div className="text-xs text-slate-300 font-mono hidden md:block">
+            ← NIE WIEM | SPACJA | WIEM →
+        </div>
 
         <button 
-            onClick={(e) => { e.stopPropagation(); onResult(true); setIsFlipped(false); }}
+            onClick={(e) => { e.stopPropagation(); triggerResult(true); }}
             className="group flex flex-col items-center gap-2 transition-transform hover:scale-105"
         >
              <div className="w-16 h-16 md:w-20 md:h-20 rounded-full border-2 border-green-100 bg-white group-hover:bg-green-50 group-hover:border-green-200 flex items-center justify-center shadow-md text-green-500 text-3xl md:text-4xl transition-colors">

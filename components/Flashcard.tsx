@@ -129,7 +129,8 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
           // Apply translation first, then tilt, then flip. 
           // This ensures that dragging RIGHT always moves the card RIGHT on screen, regardless of flip state.
           transform: `translateX(${effectiveX}px) rotate(${rotate}deg) rotateY(${isFlipped ? 180 : 0}deg)`,
-          transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
+          // MODIFIED: Changed 0.3s to 0.6s for slower animation
+          transition: isDragging ? 'none' : 'transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)',
         }}
       >
         {/* Front */}

@@ -19,6 +19,7 @@ const App: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [listFilter, setListFilter] = useState<StudySource>(StudySource.All);
+  const [selectedCategory, setSelectedCategory] = useState('Losowe');
 
   useEffect(() => {
     const loadedWords = storageService.getWords();
@@ -195,15 +196,15 @@ const App: React.FC = () => {
        </div>
 
        <div className="mt-8 bg-indigo-50 p-6 rounded-2xl border border-indigo-100">
-           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
-                <div className="flex items-center gap-3">
-                    <h3 className="text-lg font-bold text-indigo-900">✨ AI Generator Słów</h3>
-                    {isGenerating && <span className="text-sm text-indigo-600 animate-pulse">Generowanie...</span>}
-                </div>
-                
+           <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-indigo-900">✨ AI Generator Słów</h3>
+                {isGenerating && <span className="text-sm text-indigo-600 animate-pulse">Generowanie...</span>}
+           </div>
+           
+           <div className="flex flex-col md:flex-row gap-3">
                 {/* Level Selector */}
-                <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-lg border border-indigo-200 shadow-sm">
-                   <span className="text-xs text-indigo-500 font-bold uppercase">Poziom:</span>
+                <div className="flex-1 flex items-center gap-2 bg-white px-4 py-3 rounded-xl border border-indigo-200 shadow-sm">
+                   <span className="text-xs text-indigo-400 font-bold uppercase tracking-wider">Poziom</span>
                    <select 
                        value={settings.level}
                        onChange={(e) => {
@@ -211,27 +212,45 @@ const App: React.FC = () => {
                            setSettings(newS);
                            storageService.saveSettings(newS);
                        }}
-                       className="text-indigo-900 font-bold text-sm focus:outline-none cursor-pointer bg-transparent"
+                       className="flex-1 text-indigo-900 font-bold text-sm bg-transparent outline-none cursor-pointer"
                    >
                        {Object.values(LanguageLevel).map(lvl => (
                            <option key={lvl} value={lvl}>{lvl}</option>
                        ))}
                    </select>
                </div>
+
+               {/* Category Selector */}
+               <div className="flex-[2] flex items-center gap-2 bg-white px-4 py-3 rounded-xl border border-indigo-200 shadow-sm">
+                    <span className="text-xs text-indigo-400 font-bold uppercase tracking-wider">Temat</span>
+                    <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="flex-1 text-indigo-900 font-bold text-sm bg-transparent outline-none cursor-pointer"
+                    >
+                        {['Losowe', 'Biznes', 'Podróże', 'Jedzenie', 'Technologia', 'Dom', 'Natura', 'Emocje', 'Zdrowie', 'Sport'].map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                    </select>
+               </div>
            </div>
            
-           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-               {['Losowe', 'Biznes', 'Podróże', 'Jedzenie', 'Technologia', 'Dom', 'Natura', 'Emocje', 'Zdrowie', 'Sport'].map(cat => (
-                   <button 
-                       key={cat} 
-                       disabled={isGenerating} 
-                       onClick={() => handleGenerateWords(cat)} 
-                       className={`px-4 py-2 rounded-full text-sm font-medium transition-colors border border-indigo-200 whitespace-nowrap shadow-sm ${cat === 'Losowe' ? 'bg-indigo-100 text-indigo-800 border-indigo-300 font-bold hover:bg-indigo-200' : 'bg-white text-indigo-600 hover:bg-indigo-600 hover:text-white'}`}
-                    >
-                        {cat === 'Losowe' ? '🎲 Losowe' : `+ ${cat}`}
-                    </button>
-               ))}
-           </div>
+           <button 
+                onClick={() => handleGenerateWords(selectedCategory)}
+                disabled={isGenerating}
+                className="mt-3 w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+           >
+                {isGenerating ? (
+                    <>
+                        <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                        <span>Tworzenie fiszek...</span>
+                    </>
+                ) : (
+                    <>
+                        <span>🚀 Generuj Słowa</span>
+                    </>
+                )}
+           </button>
        </div>
     </div>
   );

@@ -15,7 +15,8 @@ const internalPerplexityService = {
   ): Promise<Word[]> => {
     if (!apiKey) throw new Error("Missing Perplexity API Key");
 
-    const prompt = `Generate exactly ${count} English vocabulary words related to "${category}" for CEFR level ${level}. 
+    const topicPrompt = category === 'Losowe' ? 'random topics (general vocabulary)' : `"${category}"`;
+    const prompt = `Generate exactly ${count} English vocabulary words related to ${topicPrompt} for CEFR level ${level}. 
     Exclude: ${existingWords.join(", ")}. 
     Return ONLY a raw JSON array of objects with keys: "english", "polish", "exampleSentence". 
     Example: [{"english": "reliable", "polish": "niezawodny", "exampleSentence": "He is a reliable employee who never misses a deadline."}]`;
@@ -148,7 +149,8 @@ export const geminiService = {
     
     // Route to Custom API if selected
     if (settings.aiProvider === 'custom') {
-        const prompt = `Generate exactly ${count} English vocabulary words for category "${category}" level ${level}. Exclude: ${existingWords.join(", ")}. Return ONLY a JSON array: [{"english": "...", "polish": "...", "exampleSentence": "..."}]`;
+        const topicPrompt = category === 'Losowe' ? 'random topics (general vocabulary)' : `"${category}"`;
+        const prompt = `Generate exactly ${count} English vocabulary words for category ${topicPrompt} level ${level}. Exclude: ${existingWords.join(", ")}. Return ONLY a JSON array: [{"english": "...", "polish": "...", "exampleSentence": "..."}]`;
         const content = await geminiService.fetchCustomAI(prompt);
         const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
         const rawData = JSON.parse(cleanContent);
@@ -166,7 +168,8 @@ export const geminiService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
     const modelName = settings.aiModelType === 'pro' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
 
-    const prompt = `Generate ${count} English vocabulary words related to "${category}" for CEFR level ${level}. 
+    const topicPrompt = category === 'Losowe' ? 'random topics (general vocabulary)' : `"${category}"`;
+    const prompt = `Generate ${count} English vocabulary words related to ${topicPrompt} for CEFR level ${level}. 
     Exclude: ${existingWords.join(", ")}. 
     Return JSON only: [{"english": "...", "polish": "...", "exampleSentence": "..."}]`;
 

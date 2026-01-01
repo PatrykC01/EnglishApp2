@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Word, StudyMode } from '../types';
 import Flashcard from '../components/Flashcard';
 import { geminiService } from '../services/gemini';
@@ -35,11 +34,16 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
   const [matchMistakes, setMatchMistakes] = useState<Set<string>>(new Set());
   const [isProcessingMatch, setIsProcessingMatch] = useState(false);
 
+  // Audio Auto-play State
+  const hasAutoPlayedRef = useRef(false);
+
   const currentWord = words[currentIndex];
 
   // Load image when word changes (only for non-grid modes)
   useEffect(() => {
-    // Fix: Updated StudyMode keys to lowercase to match types.ts definition
+    // Reset auto-play flag when word changes
+    hasAutoPlayedRef.current = false;
+
     if (currentWord && (mode === StudyMode.flashcards || mode === StudyMode.typing || mode === StudyMode.listening)) {
         setCurrentImage(undefined);
         
@@ -58,7 +62,7 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
                 .catch(err => console.error(err));
         }
     }
-  }, [currentWord, mode]); // removed onUpdateWord dependency to avoid loops
+  }, [currentWord, mode]); 
 
   const handleRegenerateImage = () => {
      if (!currentWord) return;
@@ -75,7 +79,6 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
 
   // Initialize Match Mode
   useEffect(() => {
-    // Fix: Updated StudyMode.Match to StudyMode.match
     if (mode === StudyMode.match && words.length > 0) {
         const cards: MatchCard[] = [];
         words.forEach(w => {
@@ -95,14 +98,38 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
     }
   }, [mode, words]);
 
-  // TTS Helper
+  // TTS Helper - Robust for Mobile
   const speak = useCallback((text: string) => {
     if ('speechSynthesis' in window) {
+        // CRITICAL FOR MOBILE: Cancel any ongoing speech to prevent queue blocking
+        window.speechSynthesis.cancel();
+
         const u = new SpeechSynthesisUtterance(text);
-        u.lang = 'en-US';
+        u.lang = 'en-US'; // Force English
+        u.rate = 0.9; // Slightly slower for clarity
+        u.pitch = 1;
+        
+        // Attempt to find a better voice (e.g., Google US English on Android)
+        const voices = window.speechSynthesis.getVoices();
+        const enVoice = voices.find(v => v.lang === 'en-US' && v.name.includes('Google')) || voices.find(v => v.lang === 'en-US');
+        if (enVoice) u.voice = enVoice;
+
         window.speechSynthesis.speak(u);
     }
   }, []);
+
+  // Auto-play for Listening Mode
+  useEffect(() => {
+    if (mode === StudyMode.listening && currentWord && !hasAutoPlayedRef.current) {
+        // Small delay to ensure browser readiness
+        const timer = setTimeout(() => {
+            speak(currentWord.english);
+            hasAutoPlayedRef.current = true;
+        }, 600);
+        return () => clearTimeout(timer);
+    }
+  }, [currentWord, mode, speak]);
+
 
   const handleNext = (correct: boolean) => {
     const newResults = [...results, { wordId: currentWord.id, correct }];
@@ -178,7 +205,6 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
 
   // --- RENDERERS ---
 
-  // Fix: Updated StudyMode.Flashcards to StudyMode.flashcards
   if (mode === StudyMode.flashcards) {
     return (
       <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden">
@@ -207,7 +233,6 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
     );
   }
 
-  // Fix: Updated StudyMode.Typing to StudyMode.typing
   if (mode === StudyMode.typing) {
     const checkTyping = async () => {
         setTypingFeedback('neutral');
@@ -296,50 +321,80 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
     );
   }
 
-  // Fix: Updated StudyMode.Listening to StudyMode.listening
   if (mode === StudyMode.listening) {
     return (
         <div className="flex flex-col items-center h-full justify-center max-w-md mx-auto px-4">
+            <div className="w-full flex justify-end mb-4 absolute top-4 right-4">
+                 <button onClick={onExit} className="text-slate-400 px-4">✕</button>
+            </div>
+
             <div className="text-center mb-8">
                 <button 
-                    onClick={() => speak(currentWord.english)}
-                    className="w-24 h-24 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-4xl mb-4 mx-auto hover:bg-indigo-200 hover:scale-105 transition-all shadow-md"
+                    onClick={(e) => {
+                        e.preventDefault();
+                        speak(currentWord.english);
+                    }}
+                    className="w-32 h-32 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-5xl mb-4 mx-auto hover:bg-indigo-200 hover:scale-105 transition-all shadow-md active:scale-95 cursor-pointer"
                 >
                     🔊
                 </button>
-                <p className="text-slate-500">Naciśnij i posłuchaj</p>
+                <p className="text-slate-500">Kliknij, aby odsłuchać ponownie</p>
+                <div className="text-xs text-slate-300 mt-2">{currentIndex + 1} / {words.length}</div>
             </div>
 
             <input 
                 type="text" 
                 value={typingInput}
                 onChange={(e) => setTypingInput(e.target.value)}
-                className="w-full p-4 text-center text-xl rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none mb-4"
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        const isCorrect = typingInput.trim().toLowerCase() === currentWord.english.toLowerCase();
+                        if(isCorrect) {
+                            setTypingFeedback('correct');
+                            handleNext(true);
+                        } else {
+                            setTypingFeedback('wrong');
+                            setTimeout(() => handleNext(false), 2000);
+                        }
+                    }
+                }}
+                className={`w-full p-4 text-center text-xl rounded-xl border-2 outline-none mb-4 transition-colors ${
+                    typingFeedback === 'wrong' ? 'border-red-500 bg-red-50' : 
+                    typingFeedback === 'correct' ? 'border-green-500 bg-green-50' : 'border-slate-200 focus:border-indigo-500'
+                }`}
                 placeholder="Co usłyszałeś?"
+                autoFocus
             />
             
             <button 
                 onClick={() => {
                      const isCorrect = typingInput.trim().toLowerCase() === currentWord.english.toLowerCase();
                      if(isCorrect) {
-                        speak("Correct!");
+                        setTypingFeedback('correct');
                         handleNext(true);
                      } else {
                         setTypingFeedback('wrong');
-                        speak(`Incorrect. The word was ${currentWord.english}`);
+                        // No spoken feedback, just visual delay
                         setTimeout(() => handleNext(false), 2000);
                      }
                 }}
-                className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold"
+                className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200"
             >
                 Sprawdź
             </button>
-            {typingFeedback === 'wrong' && <p className="mt-2 text-red-500">{currentWord.english}</p>}
+            
+            <div className="h-8 mt-2 text-center font-bold">
+                {typingFeedback === 'wrong' && (
+                    <span className="text-red-500">Błąd! Poprawnie: {currentWord.english}</span>
+                )}
+                {typingFeedback === 'correct' && (
+                    <span className="text-green-600">Dobrze!</span>
+                )}
+            </div>
         </div>
     );
   }
 
-  // Fix: Updated StudyMode.Match to StudyMode.match
   if (mode === StudyMode.match) {
       return (
           <div className="flex flex-col items-center h-full pt-4 md:pt-10 px-2">

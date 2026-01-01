@@ -134,6 +134,17 @@ const App: React.FC = () => {
       updateStats(merged);
   };
 
+  const applySubnpPreset = () => {
+      const newS = { 
+          ...settings, 
+          customApiBase: 'https://api.subnp.com/v1',
+          customModelName: 'gpt-4o'
+      };
+      setSettings(newS);
+      storageService.saveSettings(newS);
+      alert('Załadowano preset subnp.com! Pamiętaj, aby wpisać swój klucz API.');
+  };
+
   if (isStudying) {
       return (
           <div className="h-screen bg-white">
@@ -184,10 +195,41 @@ const App: React.FC = () => {
        </div>
 
        <div className="mt-8 bg-indigo-50 p-6 rounded-2xl border border-indigo-100">
-           <div className="flex justify-between items-center mb-4"><h3 className="text-lg font-bold text-indigo-900">✨ AI Generator Słów</h3>{isGenerating && <span className="text-sm text-indigo-600 animate-pulse">Generowanie...</span>}</div>
-           <div className="flex gap-2 overflow-x-auto pb-2">
-               {['Biznes', 'Podróże', 'Jedzenie', 'Technologia', 'Dom', 'Natura'].map(cat => (
-                   <button key={cat} disabled={isGenerating} onClick={() => handleGenerateWords(cat)} className="px-4 py-2 bg-white text-indigo-600 rounded-full text-sm font-medium hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-200 whitespace-nowrap">+ {cat}</button>
+           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-bold text-indigo-900">✨ AI Generator Słów</h3>
+                    {isGenerating && <span className="text-sm text-indigo-600 animate-pulse">Generowanie...</span>}
+                </div>
+                
+                {/* Level Selector */}
+                <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-lg border border-indigo-200 shadow-sm">
+                   <span className="text-xs text-indigo-500 font-bold uppercase">Poziom:</span>
+                   <select 
+                       value={settings.level}
+                       onChange={(e) => {
+                           const newS = { ...settings, level: e.target.value as LanguageLevel };
+                           setSettings(newS);
+                           storageService.saveSettings(newS);
+                       }}
+                       className="text-indigo-900 font-bold text-sm focus:outline-none cursor-pointer bg-transparent"
+                   >
+                       {Object.values(LanguageLevel).map(lvl => (
+                           <option key={lvl} value={lvl}>{lvl}</option>
+                       ))}
+                   </select>
+               </div>
+           </div>
+           
+           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+               {['Losowe', 'Biznes', 'Podróże', 'Jedzenie', 'Technologia', 'Dom', 'Natura', 'Emocje', 'Zdrowie', 'Sport'].map(cat => (
+                   <button 
+                       key={cat} 
+                       disabled={isGenerating} 
+                       onClick={() => handleGenerateWords(cat)} 
+                       className={`px-4 py-2 rounded-full text-sm font-medium transition-colors border border-indigo-200 whitespace-nowrap shadow-sm ${cat === 'Losowe' ? 'bg-indigo-100 text-indigo-800 border-indigo-300 font-bold hover:bg-indigo-200' : 'bg-white text-indigo-600 hover:bg-indigo-600 hover:text-white'}`}
+                    >
+                        {cat === 'Losowe' ? '🎲 Losowe' : `+ ${cat}`}
+                    </button>
                ))}
            </div>
        </div>
@@ -228,52 +270,66 @@ const App: React.FC = () => {
       <div className="space-y-6 max-w-lg pb-10">
           <h2 className="text-2xl font-bold">Ustawienia</h2>
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <h3 className="font-bold mb-4 text-slate-700">Główny Dostawca AI</h3>
+              <h3 className="font-bold mb-4 text-slate-700">Silniki AI</h3>
               <div className="space-y-4">
                   <div>
-                      <label className="block text-sm text-slate-500 mb-1">Wybierz silnik</label>
+                      <label className="block text-sm text-slate-500 mb-1">Generator Tekstu (Słowa, Tłumaczenia)</label>
                       <select value={settings.aiProvider} onChange={(e) => { const newS = { ...settings, aiProvider: e.target.value as any }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-white">
                           <option value="gemini">Google Gemini</option>
                           <option value="perplexity">Perplexity AI</option>
                           <option value="custom">Własne API (np. subnp.com / Kie-API)</option>
-                          <option value="pollinations">Pollinations (Tylko obrazy)</option>
                           <option value="free">Tryb podstawowy (Offline)</option>
                       </select>
                   </div>
+                  
+                  <div>
+                      <label className="block text-sm text-slate-500 mb-1">Generator Obrazów (Fiszki)</label>
+                      <select value={settings.imageProvider || 'auto'} onChange={(e) => { const newS = { ...settings, imageProvider: e.target.value as any }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-white">
+                          <option value="auto">Automatycznie (Zgodnie z powyższym)</option>
+                          <option value="pollinations">Pollinations AI (Darmowe, Nielimitowane)</option>
+                          <option value="custom">Własne API (np. DALL-E przez subnp)</option>
+                          <option value="gemini">Google Gemini Imagen</option>
+                          <option value="deepai">DeepAI</option>
+                          <option value="huggingface">Hugging Face (Limitowane)</option>
+                      </select>
+                      <p className="text-[10px] text-slate-400 mt-1">Wybierz "Pollinations AI", jeśli masz błędy limitów na Hugging Face.</p>
+                  </div>
 
                   {settings.aiProvider === 'custom' && (
-                    <div className="p-4 bg-amber-50 rounded-lg border border-amber-100 space-y-3">
-                         <h4 className="text-sm font-semibold text-amber-900 mb-2">Konfiguracja Własnego API</h4>
+                    <div className="p-4 bg-amber-50 rounded-lg border border-amber-100 space-y-3 mt-4">
+                         <div className="flex justify-between items-center">
+                            <h4 className="text-sm font-semibold text-amber-900">Konfiguracja Własnego API</h4>
+                            <button onClick={applySubnpPreset} className="text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-800 px-2 py-1 rounded-full transition-colors font-medium">
+                                Wypełnij dla subnp.com
+                            </button>
+                         </div>
                          <div>
                             <label className="text-[10px] uppercase text-amber-600 font-bold block mb-1">Endpoint URL (Base)</label>
                             <input type="text" value={settings.customApiBase} placeholder="np. https://api.subnp.com/v1" onChange={(e) => { const newS = { ...settings, customApiBase: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-white text-sm" />
                          </div>
                          <div>
                             <label className="text-[10px] uppercase text-amber-600 font-bold block mb-1">Klucz API</label>
-                            <input type="password" value={settings.customApiKey} placeholder="API Key" onChange={(e) => { const newS = { ...settings, customApiKey: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-white font-mono text-sm" />
+                            <input type="password" value={settings.customApiKey} placeholder="sk-..." onChange={(e) => { const newS = { ...settings, customApiKey: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-white font-mono text-sm" />
                          </div>
                          <div>
                             <label className="text-[10px] uppercase text-amber-600 font-bold block mb-1">Model (Tekst/Obraz)</label>
                             <input type="text" value={settings.customModelName} placeholder="np. gpt-4o" onChange={(e) => { const newS = { ...settings, customModelName: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-white text-sm" />
                          </div>
-                         <p className="text-[10px] text-amber-700 italic">
-                             Wsparcie dla proxy (np. subnp.com). Dla obrazów automatycznie użyjemy endpointu /images/generations (DALL-E 3).
-                         </p>
                     </div>
                   )}
 
                   {settings.aiProvider === 'perplexity' && (
-                    <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-100">
+                    <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-100 mt-4">
                          <h4 className="text-sm font-semibold text-indigo-900 mb-2">Perplexity API Key</h4>
                          <input type="password" value={settings.perplexityApiKey} placeholder="pplx-..." onChange={(e) => { const newS = { ...settings, perplexityApiKey: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-white font-mono text-sm" />
                     </div>
                   )}
 
-                  <hr className="border-slate-100" />
+                  <hr className="border-slate-100 my-4" />
                   
                   <div>
-                      <h4 className="text-sm font-semibold text-slate-700 mb-2">Alternatywni Dostawcy Obrazów</h4>
-                      <p className="text-xs text-slate-400 mb-3">Zostaną użyci jako fallback, jeśli główny dostawca nie wygeneruje obrazu.</p>
+                      <h4 className="text-sm font-semibold text-slate-700 mb-2">Klucze zapasowe</h4>
+                      <p className="text-xs text-slate-400 mb-3">Wypełnij tylko, jeśli używasz tych dostawców.</p>
                       <div className="space-y-3">
                          <input type="password" value={settings.deepAiApiKey} placeholder="DeepAI API Key" onChange={(e) => { const newS = { ...settings, deepAiApiKey: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-slate-50 text-sm" />
                          <input type="password" value={settings.huggingFaceApiKey} placeholder="Hugging Face API Key" onChange={(e) => { const newS = { ...settings, huggingFaceApiKey: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-slate-50 text-sm" />

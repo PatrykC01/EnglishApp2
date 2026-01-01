@@ -34,14 +34,31 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
   const [matchMistakes, setMatchMistakes] = useState<Set<string>>(new Set());
   const [isProcessingMatch, setIsProcessingMatch] = useState(false);
 
-  // Audio Auto-play State
+  // Audio State
   const hasAutoPlayedRef = useRef(false);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   const currentWord = words[currentIndex];
 
-  // Load image when word changes (only for non-grid modes)
+  // Load voices on mount (Critical for Mobile)
   useEffect(() => {
-    // Reset auto-play flag when word changes
+    const loadVoices = () => {
+        const available = window.speechSynthesis.getVoices();
+        if (available.length > 0) {
+            setVoices(available);
+        }
+    };
+
+    loadVoices();
+    
+    // Chrome/Android loads voices asynchronously
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+  }, []);
+
+  // Load image when word changes
+  useEffect(() => {
     hasAutoPlayedRef.current = false;
 
     if (currentWord && (mode === StudyMode.flashcards || mode === StudyMode.typing || mode === StudyMode.listening)) {
@@ -50,11 +67,9 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
         if (currentWord.imageUrl) {
             setCurrentImage(currentWord.imageUrl);
         } else {
-            // Generate on the fly using the example sentence for context if available
             geminiService.generateImage(currentWord.english, currentWord.exampleSentence)
                 .then(url => {
                     setCurrentImage(url);
-                    // SAVE the generated image to the word so we don't re-generate next time (CACHE)
                     if (onUpdateWord) {
                         onUpdateWord({ ...currentWord, imageUrl: url });
                     }
@@ -98,34 +113,49 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
     }
   }, [mode, words]);
 
-  // TTS Helper - Robust for Mobile
+  // Robust TTS function
   const speak = useCallback((text: string) => {
-    if ('speechSynthesis' in window) {
-        // CRITICAL FOR MOBILE: Cancel any ongoing speech to prevent queue blocking
-        window.speechSynthesis.cancel();
+    if (!('speechSynthesis' in window)) return;
 
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = 'en-US'; // Force English
-        u.rate = 0.9; // Slightly slower for clarity
-        u.pitch = 1;
-        
-        // Attempt to find a better voice (e.g., Google US English on Android)
-        const voices = window.speechSynthesis.getVoices();
-        const enVoice = voices.find(v => v.lang === 'en-US' && v.name.includes('Google')) || voices.find(v => v.lang === 'en-US');
-        if (enVoice) u.voice = enVoice;
-
-        window.speechSynthesis.speak(u);
+    // Retry getting voices if state is empty (sometimes happens on first click)
+    let availableVoices = voices;
+    if (availableVoices.length === 0) {
+        availableVoices = window.speechSynthesis.getVoices();
     }
-  }, []);
+
+    // Cancel current
+    window.speechSynthesis.cancel();
+
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US';
+    u.rate = 0.85; // Slower is better for learning
+    u.volume = 1.0; 
+
+    // Mobile Strategy: Try to find a high quality or local voice
+    const preferredVoice = 
+        availableVoices.find(v => v.lang === 'en-US' && v.localService) || // Prefer offline/fast voice
+        availableVoices.find(v => v.lang === 'en-US' && v.name.includes('Google')) ||
+        availableVoices.find(v => v.lang.startsWith('en'));
+
+    if (preferredVoice) {
+        u.voice = preferredVoice;
+    }
+
+    // Small timeout ensures the cancellation finished and audio context is ready
+    setTimeout(() => {
+        window.speechSynthesis.speak(u);
+    }, 10);
+  }, [voices]);
 
   // Auto-play for Listening Mode
   useEffect(() => {
     if (mode === StudyMode.listening && currentWord && !hasAutoPlayedRef.current) {
-        // Small delay to ensure browser readiness
+        // Reduced timeout to try and catch the "user gesture" window if possible,
+        // though on strict mobile browsers this might still fail, requiring the button.
         const timer = setTimeout(() => {
             speak(currentWord.english);
             hasAutoPlayedRef.current = true;
-        }, 600);
+        }, 500);
         return () => clearTimeout(timer);
     }
   }, [currentWord, mode, speak]);
@@ -154,23 +184,18 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
       const selected = matchCards.find(c => c.state === 'selected');
 
       if (!selected) {
-          // Select the first card
           setMatchCards(prev => prev.map(c => c.id === clickedCard.id ? { ...c, state: 'selected' } : c));
       } else {
-          // Second card clicked
           setIsProcessingMatch(true);
           
           if (selected.wordId === clickedCard.wordId) {
-              // Match found
               setMatchCards(prev => prev.map(c => 
                   (c.id === clickedCard.id || c.id === selected.id) ? { ...c, state: 'matched' } : c
               ));
               setIsProcessingMatch(false);
 
-              // Check completion
               const remaining = matchCards.filter(c => c.state !== 'matched' && c.id !== clickedCard.id && c.id !== selected.id);
               if (remaining.length === 0) {
-                  // Compile results: words with no mistakes are correct
                   const matchResults = words.map(w => ({
                       wordId: w.id,
                       correct: !matchMistakes.has(w.id)
@@ -178,21 +203,15 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
                   setTimeout(() => onComplete(matchResults), 1000);
               }
           } else {
-              // No Match
-              // Record mistake
               setMatchMistakes(prev => {
                   const newSet = new Set(prev);
                   newSet.add(selected.wordId);
                   newSet.add(clickedCard.wordId);
                   return newSet;
               });
-
-              // Show Error State
               setMatchCards(prev => prev.map(c => 
                   (c.id === clickedCard.id || c.id === selected.id) ? { ...c, state: 'wrong' } : c
               ));
-
-              // Reset after delay
               setTimeout(() => {
                   setMatchCards(prev => prev.map(c => 
                       (c.id === clickedCard.id || c.id === selected.id) ? { ...c, state: 'default' } : c
@@ -208,7 +227,6 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
   if (mode === StudyMode.flashcards) {
     return (
       <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden">
-        {/* Header - Fixed Top */}
         <div className="w-full flex justify-between items-center p-4 z-10">
              <button onClick={onExit} className="text-slate-400 hover:text-slate-600 flex items-center gap-1">
                <span className="text-xl">✕</span> Zakończ
@@ -218,7 +236,6 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
              </div>
         </div>
         
-        {/* Card Container - Centered in remaining space */}
         <div className="flex-1 flex flex-col items-center justify-center relative w-full">
             <Flashcard 
                 word={currentWord} 
@@ -226,7 +243,6 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
                 imageUrl={currentImage}
                 onRegenerateImage={handleRegenerateImage}
             />
-             {/* MODIFIED: Hidden on mobile to avoid overlap */}
              <p className="mt-8 text-xs text-slate-400 hidden md:block">Przesuń w prawo jeśli umiesz, w lewo jeśli nie.</p>
         </div>
       </div>
@@ -238,7 +254,6 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
         setTypingFeedback('neutral');
         setTypingMessage('Sprawdzanie...');
         
-        // 1. First, try simple strict equality to save API calls
         const cleanInput = typingInput.trim().toLowerCase();
         const cleanTarget = currentWord.english.trim().toLowerCase();
 
@@ -249,10 +264,8 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
             return;
         }
 
-        // 2. If strict check fails, ask AI (for synonyms/typos)
         const result = await geminiService.checkTranslation(currentWord.polish, typingInput);
         
-        // 3. Handle AI Error (Fallback to strict check result, which we already know is false here)
         if (result.feedback === 'AI_ERROR') {
              setTypingFeedback('wrong');
              setTypingMessage('Błędnie (AI niedostępne, wymagane dokładne tłumaczenie)');
@@ -332,13 +345,14 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
                 <button 
                     onClick={(e) => {
                         e.preventDefault();
+                        // Force a direct retry if voices were empty previously
                         speak(currentWord.english);
                     }}
                     className="w-32 h-32 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-5xl mb-4 mx-auto hover:bg-indigo-200 hover:scale-105 transition-all shadow-md active:scale-95 cursor-pointer"
                 >
                     🔊
                 </button>
-                <p className="text-slate-500">Kliknij, aby odsłuchać ponownie</p>
+                <p className="text-slate-500">Kliknij, aby odsłuchać</p>
                 <div className="text-xs text-slate-300 mt-2">{currentIndex + 1} / {words.length}</div>
             </div>
 
@@ -351,10 +365,11 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
                         const isCorrect = typingInput.trim().toLowerCase() === currentWord.english.toLowerCase();
                         if(isCorrect) {
                             setTypingFeedback('correct');
-                            handleNext(true);
+                            // Delay slightly longer to read the success message
+                            setTimeout(() => handleNext(true), 2000);
                         } else {
                             setTypingFeedback('wrong');
-                            setTimeout(() => handleNext(false), 2000);
+                            setTimeout(() => handleNext(false), 2500);
                         }
                     }
                 }}
@@ -371,11 +386,10 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
                      const isCorrect = typingInput.trim().toLowerCase() === currentWord.english.toLowerCase();
                      if(isCorrect) {
                         setTypingFeedback('correct');
-                        handleNext(true);
+                        setTimeout(() => handleNext(true), 2000);
                      } else {
                         setTypingFeedback('wrong');
-                        // No spoken feedback, just visual delay
-                        setTimeout(() => handleNext(false), 2000);
+                        setTimeout(() => handleNext(false), 2500);
                      }
                 }}
                 className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200"
@@ -383,12 +397,19 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
                 Sprawdź
             </button>
             
-            <div className="h-8 mt-2 text-center font-bold">
+            {/* Visual Feedback Area */}
+            <div className="h-16 mt-4 text-center flex items-center justify-center">
                 {typingFeedback === 'wrong' && (
-                    <span className="text-red-500">Błąd! Poprawnie: {currentWord.english}</span>
+                    <div className="animate-shake">
+                         <div className="text-red-500 font-bold text-lg">Błąd!</div>
+                         <div className="text-slate-500">Poprawnie: <span className="font-semibold text-slate-800">{currentWord.english}</span></div>
+                    </div>
                 )}
                 {typingFeedback === 'correct' && (
-                    <span className="text-green-600">Dobrze!</span>
+                    <div className="animate-bounce">
+                         <div className="text-green-600 font-bold text-2xl">Świetnie! 🎉</div>
+                         <div className="text-slate-500">{currentWord.english}</div>
+                    </div>
                 )}
             </div>
         </div>

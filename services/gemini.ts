@@ -165,7 +165,12 @@ export const geminiService = {
         return internalPerplexityService.generateWords(category, level, count, existingWords, settings.perplexityApiKey);
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+        throw new Error("Brak klucza API (API_KEY). Upewnij się, że serwer został uruchomiony z poprawnymi zmiennymi środowiskowymi.");
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
     const modelName = settings.aiModelType === 'pro' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
 
     const topicPrompt = category === 'Losowe' ? 'random topics (general vocabulary)' : `"${category}"`;
@@ -212,9 +217,9 @@ export const geminiService = {
         }));
       }
       return [];
-    } catch (error) {
-      console.error("Gemini Error:", error);
-      throw error;
+    } catch (error: any) {
+      console.error("Gemini Error Full:", error);
+      throw new Error(`Gemini Error: ${error.message || error.statusText || 'Unknown'}`);
     }
   },
 
@@ -235,7 +240,10 @@ export const geminiService = {
           return internalPerplexityService.translateWord(inputWord, inputLang, settings.perplexityApiKey);
       }
 
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) throw new Error("Brak klucza API w buildzie (API_KEY).");
+
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
           model: "gemini-3-flash-preview",
           contents: prompt,
@@ -263,7 +271,10 @@ export const geminiService = {
       }
 
       // Fallback/Standard logic (Gemini)
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) return "";
+
+      const ai = new GoogleGenAI({ apiKey });
       try {
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
@@ -324,7 +335,10 @@ export const geminiService = {
     // 3. Forced Strategy: Gemini
     if (strategy === 'gemini') {
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+            const apiKey = process.env.API_KEY;
+            if (!apiKey) throw new Error("No API Key");
+
+            const ai = new GoogleGenAI({ apiKey });
             const modelName = settings.aiModelType === 'pro' ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
             const response = await ai.models.generateContent({
               model: modelName,
@@ -413,7 +427,10 @@ export const geminiService = {
          }
      }
 
-     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+     const apiKey = process.env.API_KEY;
+     if (!apiKey) return { isCorrect: false, feedback: "AI_ERROR (No Key)" };
+
+     const ai = new GoogleGenAI({ apiKey });
      try {
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",

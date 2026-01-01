@@ -171,6 +171,7 @@ export const geminiService = {
     }
 
     const ai = new GoogleGenAI({ apiKey });
+    // Use the model selected in settings
     const modelName = settings.aiModelType === 'pro' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
 
     const topicPrompt = category === 'Losowe' ? 'random topics (general vocabulary)' : `"${category}"`;
@@ -244,8 +245,10 @@ export const geminiService = {
       if (!apiKey) throw new Error("Brak klucza API w buildzie (API_KEY).");
 
       const ai = new GoogleGenAI({ apiKey });
+      const modelName = settings.aiModelType === 'pro' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
+      
       const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+          model: modelName,
           contents: prompt,
           config: { responseMimeType: "application/json" }
       });
@@ -275,9 +278,11 @@ export const geminiService = {
       if (!apiKey) return "";
 
       const ai = new GoogleGenAI({ apiKey });
+      const modelName = settings.aiModelType === 'pro' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
+
       try {
         const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: modelName,
             contents: prompt,
             config: { responseMimeType: "application/json" }
         });
@@ -431,9 +436,11 @@ export const geminiService = {
      if (!apiKey) return { isCorrect: false, feedback: "AI_ERROR (No Key)" };
 
      const ai = new GoogleGenAI({ apiKey });
+     const modelName = settings.aiModelType === 'pro' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
+
      try {
         const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: modelName,
             contents: prompt,
             config: { responseMimeType: "application/json" }
         });

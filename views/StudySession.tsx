@@ -267,10 +267,10 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
     return (
       <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden">
         {renderHeader()}
-        {/* Updated padding here: px-2 to px-4/6 for better edge spacing */}
-        <div className="flex-1 flex flex-col items-center justify-center relative w-full px-4 md:px-6 pb-4">
+        {/* Added pb-8 for safe area */}
+        <div className="flex-1 flex flex-col items-center justify-center relative w-full px-2 pb-8">
             <Flashcard word={currentWord} onResult={handleNext} imageUrl={currentImage} onRegenerateImage={handleRegenerateImage} />
-            <p className="mt-4 text-xs text-slate-400 hidden md:block">Przesuń w prawo jeśli umiesz, w lewo jeśli nie.</p>
+            <p className="mt-2 text-xs text-slate-400 hidden md:block">Przesuń w prawo jeśli umiesz, w lewo jeśli nie.</p>
         </div>
       </div>
     );

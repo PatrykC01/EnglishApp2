@@ -291,6 +291,40 @@ const App: React.FC = () => {
       <div className="space-y-6 max-w-lg pb-32 md:pb-10">
           <h2 className="text-2xl font-bold">Ustawienia</h2>
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+              <div className="mb-6 border-b border-slate-100 pb-6">
+                  <h3 className="font-bold mb-4 text-slate-700">Profil</h3>
+                  <div className="space-y-4">
+                      <div>
+                          <label className="block text-sm text-slate-500 mb-1">Twoje Imię</label>
+                          <input 
+                              type="text" 
+                              value={settings.userName} 
+                              onChange={(e) => { 
+                                  const newS = { ...settings, userName: e.target.value }; 
+                                  setSettings(newS); 
+                                  storageService.saveSettings(newS); 
+                              }} 
+                              className="w-full p-2 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                              placeholder="Wpisz swoje imię"
+                          />
+                      </div>
+                      <div>
+                           <label className="block text-sm text-slate-500 mb-1">Dzienny Cel (słowa)</label>
+                           <input 
+                              type="number" 
+                              value={settings.dailyGoal} 
+                              onChange={(e) => { 
+                                  const val = parseInt(e.target.value) || 0;
+                                  const newS = { ...settings, dailyGoal: val }; 
+                                  setSettings(newS); 
+                                  storageService.saveSettings(newS); 
+                              }} 
+                              className="w-full p-2 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                          />
+                      </div>
+                  </div>
+              </div>
+
               <h3 className="font-bold mb-4 text-slate-700">Silniki AI</h3>
               <div className="space-y-4">
                   <div>

@@ -18,6 +18,11 @@ const internalPerplexityService = {
     const topicPrompt = category === 'Losowe' ? 'random topics (general vocabulary)' : `"${category}"`;
     const prompt = `Generate exactly ${count} English vocabulary words related to ${topicPrompt} for CEFR level ${level}. 
     Exclude: ${existingWords.join(", ")}. 
+    
+    Requirements:
+    1. Provide the English word and its Polish translation.
+    2. Provide an example sentence that CLEARLY illustrates the specific meaning of the Polish translation provided (context consistency).
+    
     Return ONLY a raw JSON array of objects with keys: "english", "polish", "exampleSentence". 
     Example: [{"english": "reliable", "polish": "niezawodny", "exampleSentence": "He is a reliable employee who never misses a deadline."}]`;
 
@@ -88,8 +93,9 @@ const internalPerplexityService = {
       return JSON.parse(content.replace(/```json/g, '').replace(/```/g, '').trim());
   },
 
-  generateExampleSentence: async (englishWord: string, apiKey: string) => {
+  generateExampleSentence: async (englishWord: string, apiKey: string, polishContext?: string) => {
       const prompt = `Generate one short, simple English example sentence using the word "${englishWord}". 
+      ${polishContext ? `The sentence MUST reflect the specific meaning of this word as translated to Polish: "${polishContext}".` : ''}
       Return JSON: {"exampleSentence": "..."}`;
 
       try {
@@ -150,7 +156,10 @@ export const geminiService = {
     // Route to Custom API if selected
     if (settings.aiProvider === 'custom') {
         const topicPrompt = category === 'Losowe' ? 'random topics (general vocabulary)' : `"${category}"`;
-        const prompt = `Generate exactly ${count} English vocabulary words for category ${topicPrompt} level ${level}. Exclude: ${existingWords.join(", ")}. Return ONLY a JSON array: [{"english": "...", "polish": "...", "exampleSentence": "..."}]`;
+        const prompt = `Generate exactly ${count} English vocabulary words for category ${topicPrompt} level ${level}. 
+        Exclude: ${existingWords.join(", ")}. 
+        Requirement: The example sentence MUST strictly match the meaning of the Polish translation.
+        Return ONLY a JSON array: [{"english": "...", "polish": "...", "exampleSentence": "..."}]`;
         const content = await geminiService.fetchCustomAI(prompt);
         const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
         const rawData = JSON.parse(cleanContent);
@@ -177,6 +186,9 @@ export const geminiService = {
     const topicPrompt = category === 'Losowe' ? 'random topics (general vocabulary)' : `"${category}"`;
     const prompt = `Generate ${count} English vocabulary words related to ${topicPrompt} for CEFR level ${level}. 
     Exclude: ${existingWords.join(", ")}. 
+    Requirements:
+    1. Provide the English word and its Polish translation.
+    2. The example sentence MUST CLEARLY illustrate the specific meaning of the Polish translation provided.
     Return JSON only: [{"english": "...", "polish": "...", "exampleSentence": "..."}]`;
 
     try {
@@ -255,10 +267,11 @@ export const geminiService = {
       return JSON.parse(response.text || '{}');
   },
 
-  // NEW METHOD: Generate only example sentence
-  generateExampleSentence: async (englishWord: string): Promise<string> => {
+  // NEW METHOD: Generate only example sentence with Context Anchoring
+  generateExampleSentence: async (englishWord: string, polishContext?: string): Promise<string> => {
       const settings: Settings = storageService.getSettings();
       const prompt = `Generate one short, simple English example sentence using the word "${englishWord}". 
+      ${polishContext ? `The sentence MUST reflect the specific meaning of this word as translated to Polish: "${polishContext}".` : ''}
       Return JSON: {"exampleSentence": "..."}`;
 
       if (settings.aiProvider === 'custom') {
@@ -270,7 +283,7 @@ export const geminiService = {
       }
 
       if (settings.aiProvider === 'perplexity') {
-          return internalPerplexityService.generateExampleSentence(englishWord, settings.perplexityApiKey);
+          return internalPerplexityService.generateExampleSentence(englishWord, settings.perplexityApiKey, polishContext);
       }
 
       // Fallback/Standard logic (Gemini)

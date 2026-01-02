@@ -251,16 +251,25 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
       );
   }
 
+  // Common Header for all modes within StudySession
+  const renderHeader = () => (
+      <div className="w-full flex justify-between items-center p-4 z-20 shrink-0">
+          <button onClick={onExit} className="text-slate-400 hover:text-slate-600 flex items-center gap-1 p-2">
+              <span className="text-xl">✕</span> Zakończ
+          </button>
+          <div className="bg-white px-4 py-1 rounded-full text-slate-500 font-medium shadow-sm border border-slate-100">
+              {currentIndex + 1} / {words.length}
+          </div>
+      </div>
+  );
+
   if (mode === StudyMode.flashcards) {
     return (
       <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden">
-        <div className="w-full flex justify-between items-center p-4 z-10">
-             <button onClick={onExit} className="text-slate-400 hover:text-slate-600 flex items-center gap-1"><span className="text-xl">✕</span> Zakończ</button>
-             <div className="bg-white px-4 py-1 rounded-full text-slate-500 font-medium shadow-sm border border-slate-100">{currentIndex + 1} / {words.length}</div>
-        </div>
-        <div className="flex-1 flex flex-col items-center justify-center relative w-full">
+        {renderHeader()}
+        <div className="flex-1 flex flex-col items-center justify-center relative w-full px-2 pb-4">
             <Flashcard word={currentWord} onResult={handleNext} imageUrl={currentImage} onRegenerateImage={handleRegenerateImage} />
-            <p className="mt-8 text-xs text-slate-400 hidden md:block">Przesuń w prawo jeśli umiesz, w lewo jeśli nie.</p>
+            <p className="mt-4 text-xs text-slate-400 hidden md:block">Przesuń w prawo jeśli umiesz, w lewo jeśli nie.</p>
         </div>
       </div>
     );
@@ -294,81 +303,82 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
     };
 
     return (
-      <div className="flex flex-col items-center h-full justify-center max-w-md mx-auto px-4">
-         <div className="mb-8 w-full">
-            <div className="flex justify-between mb-4"><button onClick={onExit} className="text-slate-400">✕</button><span>{currentIndex + 1} / {words.length}</span></div>
-            {currentImage && <img src={currentImage} className="w-32 h-32 mx-auto rounded-lg object-cover mb-4 shadow-sm" alt="hint" />}
-            <h2 className="text-3xl font-bold text-center mb-2">{currentWord.polish}</h2>
-            <p className="text-center text-slate-400 text-sm">Przetłumacz na angielski</p>
+      <div className="flex flex-col h-full bg-slate-50">
+         {renderHeader()}
+         <div className="flex-1 flex flex-col items-center justify-center max-w-md mx-auto px-4 w-full">
+            <div className="mb-4 w-full text-center">
+                {currentImage && <img src={currentImage} className="w-32 h-32 mx-auto rounded-lg object-cover mb-4 shadow-sm" alt="hint" />}
+                <h2 className="text-3xl font-bold text-center mb-2">{currentWord.polish}</h2>
+                <p className="text-center text-slate-400 text-sm">Przetłumacz na angielski</p>
+            </div>
+            <input type="text" value={typingInput} onChange={(e) => setTypingInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && checkTyping()} className={`w-full p-4 text-center text-xl rounded-xl border-2 outline-none transition-all ${typingFeedback === 'neutral' ? 'border-slate-200 focus:border-indigo-500' : typingFeedback === 'correct' ? 'border-green-500 bg-green-50 text-green-700' : 'border-red-500 bg-red-50 text-red-700'}`} placeholder="Wpisz słowo..." autoFocus />
+            <button onClick={checkTyping} className="mt-6 w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">Sprawdź</button>
+            <div className="mt-4 text-center min-h-[1.5rem]">{typingFeedback === 'wrong' && (<div className="text-red-500 font-medium animate-shake">{typingMessage} <br/><span className="text-sm text-slate-500">Poprawnie: {currentWord.english}</span></div>)}{typingFeedback === 'correct' && (<div className="text-green-600 font-medium">{typingMessage}</div>)}</div>
          </div>
-         <input type="text" value={typingInput} onChange={(e) => setTypingInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && checkTyping()} className={`w-full p-4 text-center text-xl rounded-xl border-2 outline-none transition-all ${typingFeedback === 'neutral' ? 'border-slate-200 focus:border-indigo-500' : typingFeedback === 'correct' ? 'border-green-500 bg-green-50 text-green-700' : 'border-red-500 bg-red-50 text-red-700'}`} placeholder="Wpisz słowo..." autoFocus />
-         <button onClick={checkTyping} className="mt-6 w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">Sprawdź</button>
-         <div className="mt-4 text-center min-h-[1.5rem]">{typingFeedback === 'wrong' && (<div className="text-red-500 font-medium animate-shake">{typingMessage} <br/><span className="text-sm text-slate-500">Poprawnie: {currentWord.english}</span></div>)}{typingFeedback === 'correct' && (<div className="text-green-600 font-medium">{typingMessage}</div>)}</div>
       </div>
     );
   }
 
   if (mode === StudyMode.listening) {
     return (
-        <div className="flex flex-col items-center h-full justify-center max-w-md mx-auto px-4">
-            <div className="w-full flex justify-end mb-4 absolute top-4 right-4"><button onClick={onExit} className="text-slate-400 px-4">✕</button></div>
+        <div className="flex flex-col h-full bg-slate-50">
+            {renderHeader()}
+            <div className="flex-1 flex flex-col items-center justify-center max-w-md mx-auto px-4 w-full">
+                <div className="text-center mb-8">
+                    <button 
+                        onClick={(e) => {
+                            e.preventDefault();
+                            speak(currentWord.english);
+                        }}
+                        className="w-32 h-32 rounded-full bg-indigo-100 text-indigo-600 flex flex-col items-center justify-center mb-4 mx-auto hover:bg-indigo-200 hover:scale-105 transition-all shadow-md active:scale-95 cursor-pointer relative"
+                    >
+                        <span className="text-5xl mb-2">🔊</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wide opacity-70">Odsłuchaj</span>
+                        <span className="absolute w-full h-full rounded-full border-4 border-indigo-200 animate-ping opacity-20 pointer-events-none"></span>
+                    </button>
+                </div>
 
-            <div className="text-center mb-8">
-                <button 
-                    onClick={(e) => {
-                        e.preventDefault();
-                        speak(currentWord.english);
+                <input 
+                    type="text" 
+                    value={typingInput}
+                    onChange={(e) => setTypingInput(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            const isCorrect = typingInput.trim().toLowerCase() === currentWord.english.toLowerCase();
+                            if(isCorrect) { setTypingFeedback('correct'); setTimeout(() => handleNext(true), 2000); } 
+                            else { setTypingFeedback('wrong'); setTimeout(() => handleNext(false), 2500); }
+                        }
                     }}
-                    className="w-32 h-32 rounded-full bg-indigo-100 text-indigo-600 flex flex-col items-center justify-center mb-4 mx-auto hover:bg-indigo-200 hover:scale-105 transition-all shadow-md active:scale-95 cursor-pointer relative"
-                >
-                    <span className="text-5xl mb-2">🔊</span>
-                    <span className="text-[10px] font-bold uppercase tracking-wide opacity-70">Odsłuchaj</span>
-                    {/* Pulsing ring for mobile attention */}
-                    <span className="absolute w-full h-full rounded-full border-4 border-indigo-200 animate-ping opacity-20 pointer-events-none"></span>
-                </button>
-                <div className="text-xs text-slate-300 mt-2">{currentIndex + 1} / {words.length}</div>
-            </div>
-
-            <input 
-                type="text" 
-                value={typingInput}
-                onChange={(e) => setTypingInput(e.target.value)}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
+                    className={`w-full p-4 text-center text-xl rounded-xl border-2 outline-none mb-4 transition-colors ${typingFeedback === 'wrong' ? 'border-red-500 bg-red-50' : typingFeedback === 'correct' ? 'border-green-500 bg-green-50' : 'border-slate-200 focus:border-indigo-500'}`}
+                    placeholder="Co usłyszałeś?"
+                    autoFocus
+                />
+                
+                <button 
+                    onClick={() => {
                         const isCorrect = typingInput.trim().toLowerCase() === currentWord.english.toLowerCase();
                         if(isCorrect) { setTypingFeedback('correct'); setTimeout(() => handleNext(true), 2000); } 
                         else { setTypingFeedback('wrong'); setTimeout(() => handleNext(false), 2500); }
-                    }
-                }}
-                className={`w-full p-4 text-center text-xl rounded-xl border-2 outline-none mb-4 transition-colors ${typingFeedback === 'wrong' ? 'border-red-500 bg-red-50' : typingFeedback === 'correct' ? 'border-green-500 bg-green-50' : 'border-slate-200 focus:border-indigo-500'}`}
-                placeholder="Co usłyszałeś?"
-                autoFocus
-            />
-            
-            <button 
-                onClick={() => {
-                     const isCorrect = typingInput.trim().toLowerCase() === currentWord.english.toLowerCase();
-                     if(isCorrect) { setTypingFeedback('correct'); setTimeout(() => handleNext(true), 2000); } 
-                     else { setTypingFeedback('wrong'); setTimeout(() => handleNext(false), 2500); }
-                }}
-                className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200"
-            >
-                Sprawdź
-            </button>
-            
-            <div className="h-16 mt-4 text-center flex items-center justify-center">
-                {typingFeedback === 'wrong' && (
-                    <div className="animate-shake">
-                         <div className="text-red-500 font-bold text-lg">Błąd!</div>
-                         <div className="text-slate-500">Poprawnie: <span className="font-semibold text-slate-800">{currentWord.english}</span></div>
-                    </div>
-                )}
-                {typingFeedback === 'correct' && (
-                    <div className="animate-bounce">
-                         <div className="text-green-600 font-bold text-2xl">Świetnie! 🎉</div>
-                         <div className="text-slate-500">{currentWord.english}</div>
-                    </div>
-                )}
+                    }}
+                    className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200"
+                >
+                    Sprawdź
+                </button>
+                
+                <div className="h-16 mt-4 text-center flex items-center justify-center">
+                    {typingFeedback === 'wrong' && (
+                        <div className="animate-shake">
+                            <div className="text-red-500 font-bold text-lg">Błąd!</div>
+                            <div className="text-slate-500">Poprawnie: <span className="font-semibold text-slate-800">{currentWord.english}</span></div>
+                        </div>
+                    )}
+                    {typingFeedback === 'correct' && (
+                        <div className="animate-bounce">
+                            <div className="text-green-600 font-bold text-2xl">Świetnie! 🎉</div>
+                            <div className="text-slate-500">{currentWord.english}</div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
@@ -376,23 +386,28 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
 
   if (mode === StudyMode.match) {
       return (
-          // Added overflow-y-auto and pb-32 to fix scrolling and navbar obstruction on mobile
-          <div className="flex flex-col items-center w-full h-full overflow-y-auto pt-4 md:pt-10 px-2 pb-32">
-              <div className="w-full max-w-3xl flex justify-between items-center mb-6 px-2"><button onClick={onExit} className="text-slate-400 hover:text-slate-600">✕ Zakończ</button><div className="text-indigo-600 font-bold">Dopasuj pary</div></div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-3xl">
-                  {matchCards.map((card) => {
-                      // Hiding matched cards to save screen space on mobile
-                      if (card.state === 'matched') return null;
-                      return (
-                          <button
-                              key={card.id}
-                              onClick={() => handleCardClick(card)}
-                              className={`h-24 md:h-32 rounded-xl text-lg font-medium p-2 shadow-sm border-2 transition-all transform duration-200 flex items-center justify-center text-center break-words ${card.state === 'default' ? 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 hover:-translate-y-1' : ''} ${card.state === 'selected' ? 'bg-indigo-600 border-indigo-600 text-white scale-105 shadow-md' : ''} ${card.state === 'wrong' ? 'bg-red-100 border-red-400 text-red-700 animate-pulse' : ''}`}
-                          >
-                              {card.text}
-                          </button>
-                      );
-                  })}
+          // Fixed height layout for Match mode
+          <div className="flex flex-col w-full h-full bg-slate-50">
+              <div className="w-full flex justify-between items-center p-4 shrink-0">
+                  <button onClick={onExit} className="text-slate-400 hover:text-slate-600 flex items-center gap-1"><span className="text-xl">✕</span> Zakończ</button>
+                  <div className="text-indigo-600 font-bold">Dopasuj pary</div>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto px-2 pb-24 w-full flex flex-col items-center">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-3xl">
+                      {matchCards.map((card) => {
+                          if (card.state === 'matched') return null;
+                          return (
+                              <button
+                                  key={card.id}
+                                  onClick={() => handleCardClick(card)}
+                                  className={`min-h-[6rem] rounded-xl text-lg font-medium p-2 shadow-sm border-2 transition-all transform duration-200 flex items-center justify-center text-center break-words ${card.state === 'default' ? 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 hover:-translate-y-1' : ''} ${card.state === 'selected' ? 'bg-indigo-600 border-indigo-600 text-white scale-105 shadow-md' : ''} ${card.state === 'wrong' ? 'bg-red-100 border-red-400 text-red-700 animate-pulse' : ''}`}
+                              >
+                                  {card.text}
+                              </button>
+                          );
+                      })}
+                  </div>
               </div>
           </div>
       );

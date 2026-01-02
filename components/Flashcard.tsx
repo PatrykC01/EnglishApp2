@@ -139,7 +139,8 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
             <div className="absolute top-6 text-xs md:text-base uppercase tracking-[0.2em] text-slate-400 font-semibold">{word.category}</div>
             
             {/* Optimized text size: text-2xl on mobile base to prevent cutoff for long words */}
-            <h2 className="text-2xl sm:text-4xl md:text-7xl font-bold text-slate-800 mb-8 break-words max-w-full px-2 leading-tight">
+            {/* Added hyphens-auto and lang="pl" for correct hyphenation */}
+            <h2 className="text-2xl sm:text-4xl md:text-7xl font-bold text-slate-800 mb-8 break-words hyphens-auto max-w-full px-2 leading-tight" lang="pl">
               {word.polish}
             </h2>
 
@@ -179,7 +180,10 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
 
             {/* Text Section */}
             <div className="flex-1 flex flex-col items-center justify-center p-4 bg-white relative">
-                <h2 className="text-3xl md:text-6xl font-bold text-indigo-700 mb-2 md:mb-4 break-words max-w-full text-center leading-tight">{word.english}</h2>
+                {/* Added hyphens-auto and lang="en" */}
+                <h2 className="text-3xl md:text-6xl font-bold text-indigo-700 mb-2 md:mb-4 break-words hyphens-auto max-w-full text-center leading-tight" lang="en">
+                    {word.english}
+                </h2>
                 {word.exampleSentence && (
                   <div className="bg-indigo-50 px-3 py-2 rounded-xl max-w-[95%]">
                       <p className="text-indigo-800/80 italic text-xs md:text-lg font-medium leading-relaxed">

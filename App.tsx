@@ -371,6 +371,18 @@ const App: React.FC = () => {
                       <p className="text-[10px] text-slate-400 mt-1">Wybierz "Pollinations AI", jeśli masz błędy limitów na Hugging Face.</p>
                   </div>
 
+                  {/* Visual Style Selector */}
+                  <div className="mt-2">
+                       <label className="block text-sm text-slate-500 mb-1">Styl Wizualny (Obrazki)</label>
+                       <select value={settings.visualStyle || 'minimalist'} onChange={(e) => { const newS = { ...settings, visualStyle: e.target.value as any }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-white">
+                           <option value="minimalist">Minimalistyczny (Wektory)</option>
+                           <option value="realistic">Fotorealistyczny (4K)</option>
+                           <option value="cartoon">Kreskówka (Pixar/Disney)</option>
+                           <option value="pixel">Pixel Art (Retro)</option>
+                           <option value="cyberpunk">Cyberpunk (Neon)</option>
+                       </select>
+                  </div>
+
                   {settings.aiProvider === 'custom' && (
                     <div className="p-4 bg-amber-50 rounded-lg border border-amber-100 space-y-3 mt-4">
                          <div className="flex justify-between items-center">
@@ -408,7 +420,12 @@ const App: React.FC = () => {
                       <p className="text-xs text-slate-400 mb-3">Wypełnij tylko, jeśli używasz tych dostawców.</p>
                       <div className="space-y-3">
                          <input type="password" value={settings.deepAiApiKey} placeholder="DeepAI API Key" onChange={(e) => { const newS = { ...settings, deepAiApiKey: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-slate-50 text-sm" />
-                         <input type="password" value={settings.huggingFaceApiKey} placeholder="Hugging Face API Key (start z hf_...)" onChange={(e) => { const newS = { ...settings, huggingFaceApiKey: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-slate-50 text-sm" />
+                         <div className="space-y-1">
+                            <input type="password" value={settings.huggingFaceApiKey} placeholder="Hugging Face API Key (bez 'Bearer ')" onChange={(e) => { const newS = { ...settings, huggingFaceApiKey: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-slate-50 text-sm" />
+                            <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-[10px] text-indigo-500 hover:text-indigo-700 ml-1">
+                                Pobierz klucz tutaj (Wymagane: User permissions -&gt; Inference -&gt; Make calls to Inference Providers)
+                            </a>
+                         </div>
                       </div>
                   </div>
               </div>

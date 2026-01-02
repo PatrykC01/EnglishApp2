@@ -15,7 +15,8 @@ interface MatchCard {
   id: string;
   wordId: string;
   text: string;
-  state: 'default' | 'selected' | 'matched' | 'wrong';
+  // Added 'correct' state for visual feedback before hiding
+  state: 'default' | 'selected' | 'matched' | 'wrong' | 'correct';
 }
 
 const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, onUpdateWord, onExit }) => {
@@ -204,7 +205,8 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
 
   // Match Mode Logic
   const handleCardClick = (clickedCard: MatchCard) => {
-      if (isProcessingMatch || clickedCard.state === 'matched' || clickedCard.state === 'wrong' || clickedCard.state === 'selected') return;
+      // Ignore click if we are processing, or card is already matched/wrong/selected/correct
+      if (isProcessingMatch || clickedCard.state === 'matched' || clickedCard.state === 'wrong' || clickedCard.state === 'selected' || clickedCard.state === 'correct') return;
 
       const selected = matchCards.find(c => c.state === 'selected');
 
@@ -214,16 +216,28 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
           setIsProcessingMatch(true);
           
           if (selected.wordId === clickedCard.wordId) {
-              setMatchCards(prev => prev.map(c => (c.id === clickedCard.id || c.id === selected.id) ? { ...c, state: 'matched' } : c));
-              setIsProcessingMatch(false);
-              const remaining = matchCards.filter(c => c.state !== 'matched' && c.id !== clickedCard.id && c.id !== selected.id);
-              if (remaining.length === 0) {
-                  const matchResults = words.map(w => ({ wordId: w.id, correct: !matchMistakes.has(w.id) }));
-                  setTimeout(() => onComplete(matchResults), 1000);
-              }
+              // --- CORRECT MATCH ---
+              // 1. Mark as 'correct' (Green visual feedback)
+              setMatchCards(prev => prev.map(c => (c.id === clickedCard.id || c.id === selected.id) ? { ...c, state: 'correct' } : c));
+              
+              // 2. Wait, then hide (mark as 'matched')
+              setTimeout(() => {
+                  setMatchCards(prev => prev.map(c => (c.id === clickedCard.id || c.id === selected.id) ? { ...c, state: 'matched' } : c));
+                  setIsProcessingMatch(false);
+                  
+                  // Check win condition
+                  const remaining = matchCards.filter(c => c.state !== 'matched' && c.state !== 'correct' && c.id !== clickedCard.id && c.id !== selected.id);
+                  if (remaining.length === 0) {
+                      const matchResults = words.map(w => ({ wordId: w.id, correct: !matchMistakes.has(w.id) }));
+                      setTimeout(() => onComplete(matchResults), 500);
+                  }
+              }, 600); // 600ms delay to see the green success state
+
           } else {
+              // --- WRONG MATCH ---
               setMatchMistakes(prev => { const newSet = new Set(prev); newSet.add(selected.wordId); newSet.add(clickedCard.wordId); return newSet; });
               setMatchCards(prev => prev.map(c => (c.id === clickedCard.id || c.id === selected.id) ? { ...c, state: 'wrong' } : c));
+              
               setTimeout(() => {
                   setMatchCards(prev => prev.map(c => (c.id === clickedCard.id || c.id === selected.id) ? { ...c, state: 'default' } : c));
                   setIsProcessingMatch(false);
@@ -398,11 +412,22 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-3xl">
                       {matchCards.map((card) => {
                           if (card.state === 'matched') return null;
+                          
+                          let cardStyle = 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 hover:-translate-y-1';
+                          
+                          if (card.state === 'selected') {
+                              cardStyle = 'bg-indigo-600 border-indigo-600 text-white scale-105 shadow-md';
+                          } else if (card.state === 'wrong') {
+                              cardStyle = 'bg-red-100 border-red-400 text-red-700 animate-pulse';
+                          } else if (card.state === 'correct') {
+                              cardStyle = 'bg-green-100 border-green-500 text-green-700 scale-105 shadow-md';
+                          }
+
                           return (
                               <button
                                   key={card.id}
                                   onClick={() => handleCardClick(card)}
-                                  className={`min-h-[6rem] rounded-xl text-lg font-medium p-2 shadow-sm border-2 transition-all transform duration-200 flex items-center justify-center text-center break-words ${card.state === 'default' ? 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 hover:-translate-y-1' : ''} ${card.state === 'selected' ? 'bg-indigo-600 border-indigo-600 text-white scale-105 shadow-md' : ''} ${card.state === 'wrong' ? 'bg-red-100 border-red-400 text-red-700 animate-pulse' : ''}`}
+                                  className={`min-h-[6rem] rounded-xl text-lg font-medium p-2 shadow-sm border-2 transition-all transform duration-200 flex items-center justify-center text-center break-words ${cardStyle}`}
                               >
                                   {card.text}
                               </button>

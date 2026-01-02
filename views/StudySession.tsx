@@ -403,12 +403,13 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
       return (
           // Fixed height layout for Match mode
           <div className="flex flex-col w-full h-full bg-slate-50">
-              <div className="w-full flex justify-between items-center p-4 shrink-0">
+              <div className="w-full flex justify-between items-center p-4 shrink-0 relative z-20 bg-slate-50">
                   <button onClick={onExit} className="text-slate-400 hover:text-slate-600 flex items-center gap-1"><span className="text-xl">✕</span> Zakończ</button>
                   <div className="text-indigo-600 font-bold">Dopasuj pary</div>
               </div>
               
-              <div className="flex-1 overflow-y-auto px-2 pb-24 w-full flex flex-col items-center">
+              {/* Added pt-8 to prevent clipping on hover lift */}
+              <div className="flex-1 overflow-y-auto px-2 pt-8 pb-24 w-full flex flex-col items-center">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-3xl">
                       {matchCards.map((card) => {
                           if (card.state === 'matched') return null;

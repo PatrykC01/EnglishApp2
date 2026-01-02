@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS: Settings = {
   level: LanguageLevel.B1,
   aiProvider: 'free',
   imageProvider: 'auto',
+  visualStyle: 'minimalist',
   aiModelType: 'flash',
   huggingFaceApiKey: '',
   deepAiApiKey: '',

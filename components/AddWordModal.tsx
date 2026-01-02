@@ -49,7 +49,8 @@ const AddWordModal: React.FC<AddWordModalProps> = ({ isOpen, onClose, onSave, cu
         } 
         // Case 3: Both provided -> Generate ONLY the Example Sentence
         else if (finalPolish && finalEnglish) {
-            finalExample = await geminiService.generateExampleSentence(finalEnglish);
+            // Pass the Polish translation as context to ensure the example sentence matches the intended meaning
+            finalExample = await geminiService.generateExampleSentence(finalEnglish, finalPolish);
         }
 
         // Create the word object

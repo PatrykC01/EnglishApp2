@@ -151,7 +151,7 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
                 <img 
                     src={imageUrl} 
                     alt={word.english} 
-                    className="w-full h-full object-cover" 
+                    className="w-full h-full object-contain" 
                 />
              ) : (
                 <div className="w-full h-full flex items-center justify-center text-slate-300 bg-slate-50">

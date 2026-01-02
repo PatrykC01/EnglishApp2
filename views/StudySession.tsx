@@ -428,7 +428,8 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
                               <button
                                   key={card.id}
                                   onClick={() => handleCardClick(card)}
-                                  className={`min-h-[6rem] rounded-xl text-lg font-medium p-2 shadow-sm border-2 transition-all transform duration-200 flex items-center justify-center text-center break-words ${cardStyle}`}
+                                  className={`min-h-[6rem] rounded-xl text-lg font-medium p-2 shadow-sm border-2 transition-all transform duration-200 flex items-center justify-center text-center break-words hyphens-auto ${cardStyle}`}
+                                  lang={card.id.startsWith('en') ? 'en' : 'pl'}
                               >
                                   {card.text}
                               </button>

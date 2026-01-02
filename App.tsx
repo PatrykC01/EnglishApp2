@@ -408,7 +408,7 @@ const App: React.FC = () => {
                       <p className="text-xs text-slate-400 mb-3">Wypełnij tylko, jeśli używasz tych dostawców.</p>
                       <div className="space-y-3">
                          <input type="password" value={settings.deepAiApiKey} placeholder="DeepAI API Key" onChange={(e) => { const newS = { ...settings, deepAiApiKey: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-slate-50 text-sm" />
-                         <input type="password" value={settings.huggingFaceApiKey} placeholder="Hugging Face API Key" onChange={(e) => { const newS = { ...settings, huggingFaceApiKey: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-slate-50 text-sm" />
+                         <input type="password" value={settings.huggingFaceApiKey} placeholder="Hugging Face API Key (start z hf_...)" onChange={(e) => { const newS = { ...settings, huggingFaceApiKey: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-slate-50 text-sm" />
                       </div>
                   </div>
               </div>

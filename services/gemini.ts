@@ -393,13 +393,20 @@ export const geminiService = {
     
     // 5. Forced Strategy: Hugging Face
     if (strategy === 'huggingface') {
-        if (!settings.huggingFaceApiKey) return getPollinationsUrl();
+        let apiKey = settings.huggingFaceApiKey?.trim();
+        // Remove "Bearer " if user accidentally pasted it
+        if (apiKey?.startsWith('Bearer ')) {
+            apiKey = apiKey.replace('Bearer ', '').trim();
+        }
+
+        if (!apiKey) return getPollinationsUrl();
+        
         try {
             const response = await fetch(
                 "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0",
                 {
                     method: "POST",
-                    headers: { "Authorization": `Bearer ${settings.huggingFaceApiKey}`, "Content-Type": "application/json", "x-use-cache": "false" },
+                    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "x-use-cache": "false" },
                     body: JSON.stringify({ inputs: promptText }),
                 }
             );
@@ -411,6 +418,8 @@ export const geminiService = {
                     reader.onerror = reject;
                     reader.readAsDataURL(blob);
                 });
+            } else {
+                console.warn("HF Error Status:", response.status);
             }
         } catch (e) { console.warn("HF failed", e); }
         return getPollinationsUrl();

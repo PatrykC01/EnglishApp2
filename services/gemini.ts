@@ -306,9 +306,23 @@ export const geminiService = {
 
   generateImage: async (word: string, contextOrSentence?: string): Promise<string> => {
     const settings: Settings = storageService.getSettings();
+    const style = settings.visualStyle || 'minimalist';
+
+    // Style Definitions
+    const styleMap: Record<string, string> = {
+        minimalist: "minimalist vector illustration, flat design, white background, high quality",
+        realistic: "highly detailed, photorealistic, 4k, cinematic lighting, sharp focus",
+        cartoon: "vibrant cartoon style, disney pixar style, 3d render, smooth lighting",
+        pixel: "pixel art, 8-bit, retro game style, clean lines",
+        cyberpunk: "cyberpunk style, neon lights, futuristic, high contrast"
+    };
+
+    const stylePrompt = styleMap[style] || styleMap['minimalist'];
+    
+    // Construct Prompt
     const promptText = contextOrSentence 
-        ? `minimalist illustration of ${word}, scene: ${contextOrSentence}, white background, flat vector design`
-        : `minimalist vector illustration of ${word}, white background, flat design`;
+        ? `${word}, context: ${contextOrSentence}, ${stylePrompt}`
+        : `${word}, ${stylePrompt}`;
 
     // Helper to get Pollinations URL
     const getPollinationsUrl = () => {
@@ -410,6 +424,14 @@ export const geminiService = {
                     body: JSON.stringify({ inputs: promptText }),
                 }
             );
+            
+            if (response.status === 401) {
+                console.error("Hugging Face API: 401 Unauthorized. MAKE SURE YOUR TOKEN HAS 'INFERENCE' -> 'MAKE CALLS TO INFERENCE PROVIDERS' CHECKED.");
+                // We deliberately fail here to show the error in console for the user, 
+                // but we still return Pollinations so the app doesn't break.
+                // In a real app we might toast this error.
+            }
+
             if (response.ok) {
                 const blob = await response.blob();
                 return await new Promise((resolve, reject) => {

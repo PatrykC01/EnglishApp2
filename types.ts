@@ -48,6 +48,7 @@ export interface Settings {
   level: LanguageLevel;
   aiProvider: 'gemini' | 'free' | 'pollinations' | 'deepai' | 'perplexity' | 'custom';
   imageProvider: 'auto' | 'pollinations' | 'custom' | 'gemini' | 'deepai' | 'huggingface';
+  visualStyle: 'minimalist' | 'realistic' | 'cartoon' | 'pixel' | 'cyberpunk';
   aiModelType: 'flash' | 'pro';
   huggingFaceApiKey: string;
   deepAiApiKey: string;

@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { Client } from "@gradio/client";
 import { Word, LanguageLevel, WordStatus, Settings } from "../types";
 import { storageService } from "./storage";
 
@@ -331,7 +332,29 @@ export const geminiService = {
     };
 
     // Determine strategy based on imageProvider setting
-    let strategy = settings.imageProvider || 'pollinations'; // Default changed to 'pollinations'
+    let strategy = settings.imageProvider || 'hf_space'; 
+
+    // 0. New Strategy: Hugging Face Space (SDXL Lightning via Gradio)
+    if (strategy === 'hf_space') {
+        try {
+            console.log("Connecting to ByteDance/SDXL-Lightning...");
+            const client = await Client.connect("ByteDance/SDXL-Lightning");
+            const result = await client.predict("/generate_image", [
+                promptText, // Text prompt
+                "4-Step"    // Steps (Lightning is fast with 4)
+            ]);
+            
+            // Gradio client returns { data: [url_or_blob, ...] }
+            if (result && result.data && result.data[0] && result.data[0].url) {
+                return result.data[0].url;
+            }
+            throw new Error("Invalid response from HF Space");
+
+        } catch (e) {
+            console.warn("HF Space failed, falling back to Pollinations", e);
+            return getPollinationsUrl();
+        }
+    }
 
     // 1. Forced Strategy: Pollinations
     if (strategy === 'pollinations') {
@@ -405,7 +428,7 @@ export const geminiService = {
         return getPollinationsUrl();
     }
     
-    // 5. Forced Strategy: Hugging Face
+    // 5. Forced Strategy: Hugging Face (Direct Inference API - Paid/Limited)
     if (strategy === 'huggingface') {
         let apiKey = settings.huggingFaceApiKey?.trim();
         // Remove "Bearer " if user accidentally pasted it

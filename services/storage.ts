@@ -11,7 +11,7 @@ const DEFAULT_SETTINGS: Settings = {
   dailyGoal: 10,
   level: LanguageLevel.B1,
   aiProvider: 'free',
-  imageProvider: 'auto',
+  imageProvider: 'pollinations', // Changed default from 'auto' to 'pollinations' for reliability
   visualStyle: 'minimalist',
   aiModelType: 'flash',
   huggingFaceApiKey: '',

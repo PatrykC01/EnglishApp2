@@ -331,7 +331,7 @@ export const geminiService = {
     };
 
     // Determine strategy based on imageProvider setting
-    let strategy = settings.imageProvider || 'auto'; // Default to auto
+    let strategy = settings.imageProvider || 'pollinations'; // Default changed to 'pollinations'
 
     // 1. Forced Strategy: Pollinations
     if (strategy === 'pollinations') {
@@ -425,11 +425,10 @@ export const geminiService = {
                 }
             );
             
-            if (response.status === 401) {
-                console.error("Hugging Face API: 401 Unauthorized. MAKE SURE YOUR TOKEN HAS 'INFERENCE' -> 'MAKE CALLS TO INFERENCE PROVIDERS' CHECKED.");
-                // We deliberately fail here to show the error in console for the user, 
-                // but we still return Pollinations so the app doesn't break.
-                // In a real app we might toast this error.
+            // Handle Payment Required (402) and Unauthorized (401) by falling back to Pollinations
+            if (response.status === 402 || response.status === 401) {
+                console.warn(`Hugging Face API: ${response.status} (Quota Exceeded/Unauthorized). Switching to Pollinations.`);
+                return getPollinationsUrl();
             }
 
             if (response.ok) {
@@ -444,6 +443,8 @@ export const geminiService = {
                 console.warn("HF Error Status:", response.status);
             }
         } catch (e) { console.warn("HF failed", e); }
+        
+        // Final fallback if fetch itself failed
         return getPollinationsUrl();
     }
 

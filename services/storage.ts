@@ -11,7 +11,7 @@ const DEFAULT_SETTINGS: Settings = {
   dailyGoal: 10,
   level: LanguageLevel.B1,
   aiProvider: 'free',
-  imageProvider: 'pollinations', // Changed default from 'auto' to 'pollinations' for reliability
+  imageProvider: 'hf_space', // Changed default to Hugging Face Spaces (SDXL Lightning)
   visualStyle: 'minimalist',
   aiModelType: 'flash',
   huggingFaceApiKey: '',

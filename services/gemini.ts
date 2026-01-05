@@ -339,10 +339,11 @@ export const geminiService = {
         try {
             console.log("Connecting to ByteDance/SDXL-Lightning...");
             const client = await Client.connect("ByteDance/SDXL-Lightning");
+            // Cast result to any because Gradio types are tricky with indexing
             const result = await client.predict("/generate_image", [
                 promptText, // Text prompt
                 "4-Step"    // Steps (Lightning is fast with 4)
-            ]);
+            ]) as { data: any[] };
             
             // Gradio client returns { data: [url_or_blob, ...] }
             if (result && result.data && result.data[0] && result.data[0].url) {

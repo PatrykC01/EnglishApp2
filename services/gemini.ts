@@ -338,7 +338,7 @@ export const geminiService = {
     if (strategy === 'hf_space') {
         try {
             console.log("Connecting to ByteDance/SDXL-Lightning...");
-            const client = await Client.connect("ByteDance/SDXL-Lightning");
+            const client = await Client.connect("AP123/SDXL-Lightning");
             // Cast result to any because Gradio types are tricky with indexing
             const result = await client.predict("/generate_image", [
                 promptText, // Text prompt

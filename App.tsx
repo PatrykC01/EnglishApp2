@@ -360,15 +360,16 @@ const App: React.FC = () => {
                   
                   <div>
                       <label className="block text-sm text-slate-500 mb-1">Generator Obrazów (Fiszki)</label>
-                      <select value={settings.imageProvider || 'auto'} onChange={(e) => { const newS = { ...settings, imageProvider: e.target.value as any }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-white">
-                          <option value="auto">Automatycznie (Zgodnie z powyższym)</option>
-                          <option value="pollinations">Pollinations AI (Darmowe, Nielimitowane)</option>
+                      <select value={settings.imageProvider || 'hf_space'} onChange={(e) => { const newS = { ...settings, imageProvider: e.target.value as any }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-white">
+                          <option value="hf_space">Darmowe Spaces (SDXL Lightning) ⚡</option>
+                          <option value="pollinations">Pollinations AI (Zapasowe)</option>
+                          <option value="auto">Automatycznie</option>
                           <option value="custom">Własne API (np. DALL-E przez subnp)</option>
                           <option value="gemini">Google Gemini Imagen</option>
                           <option value="deepai">DeepAI</option>
                           <option value="huggingface">Hugging Face (Limitowane)</option>
                       </select>
-                      <p className="text-[10px] text-slate-400 mt-1">Wybierz "Pollinations AI", jeśli masz błędy limitów na Hugging Face.</p>
+                      <p className="text-[10px] text-slate-400 mt-1">SDXL Lightning jest najszybszy i całkowicie darmowy.</p>
                   </div>
 
                   {/* Visual Style Selector */}

@@ -160,7 +160,7 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
                   <img 
                       src={imageUrl} 
                       alt={word.english} 
-                      className="w-full h-full object-cover" 
+                      className="w-full h-full object-contain" 
                       onError={() => setImageError(true)}
                   />
                ) : (

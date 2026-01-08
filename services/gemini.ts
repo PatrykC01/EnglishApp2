@@ -5,6 +5,26 @@ import { storageService } from "./storage";
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
+// --- QUEUE MECHANISM FOR IMAGES ---
+// Pollinations and free APIs have strict rate limits.
+// We throttle requests to 1 every 3 seconds to be safe.
+let imageRequestQueue: Promise<any> = Promise.resolve();
+
+const queueImageRequest = <T>(operation: () => Promise<T>): Promise<T> => {
+    // Chain the operation to the end of the existing queue
+    const nextRequest = imageRequestQueue.then(async () => {
+        // Add a substantial polite delay (3000ms) between requests to appease rate limiters
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        return operation();
+    });
+
+    // Update the queue pointer, catching errors so the queue doesn't stall on failure
+    imageRequestQueue = nextRequest.catch(() => {});
+    
+    return nextRequest;
+};
+// ----------------------------------
+
 // Internal Perplexity Service Implementation to avoid module resolution issues
 const internalPerplexityService = {
   generateWords: async (
@@ -268,7 +288,6 @@ export const geminiService = {
       return JSON.parse(response.text || '{}');
   },
 
-  // NEW METHOD: Generate only example sentence with Context Anchoring
   generateExampleSentence: async (englishWord: string, polishContext?: string): Promise<string> => {
       const settings: Settings = storageService.getSettings();
       const prompt = `Generate one short, simple English example sentence using the word "${englishWord}". 
@@ -287,7 +306,6 @@ export const geminiService = {
           return internalPerplexityService.generateExampleSentence(englishWord, settings.perplexityApiKey, polishContext);
       }
 
-      // Fallback/Standard logic (Gemini)
       const apiKey = process.env.API_KEY;
       if (!apiKey) return "";
 
@@ -305,7 +323,14 @@ export const geminiService = {
       } catch { return ""; }
   },
 
+  // Main Image Generation Entry Point - QUEUED
   generateImage: async (word: string, contextOrSentence?: string): Promise<string> => {
+      // Wrap the actual logic in the queue function
+      return queueImageRequest(() => geminiService._generateImageUnsafe(word, contextOrSentence));
+  },
+
+  // Private unsafe method (actual implementation)
+  _generateImageUnsafe: async (word: string, contextOrSentence?: string): Promise<string> => {
     const settings: Settings = storageService.getSettings();
     const style = settings.visualStyle || 'minimalist';
 
@@ -327,58 +352,20 @@ export const geminiService = {
 
     // Helper to get Pollinations URL
     const getPollinationsUrl = () => {
-        const seed = Math.floor(Math.random() * 10000);
-        return `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?width=800&height=600&nologo=true&seed=${seed}`;
+        const seed = Math.floor(Math.random() * 100000);
+        // Using 'flux' model which is currently high quality and often less rate-limited on Pollinations
+        return `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?width=800&height=600&nologo=true&seed=${seed}&model=flux`;
     };
 
     // Determine strategy based on imageProvider setting
-    let strategy = settings.imageProvider || 'pollinations'; // Fallback default
+    let strategy = settings.imageProvider;
 
-    // 0. New Strategy: Hugging Face Space (SDXL Lightning via Gradio)
+    // Safety fallback: if user is still on 'hf_space' (broken), force Pollinations
     if (strategy === 'hf_space') {
-        try {
-            console.log("Connecting to ByteDance/SDXL-Lightning...");
-            
-            // Pass token if present to avoid anonymous rate limits
-            const options: any = {};
-            
-            // Prioritize settings key, then environment variable
-            let hfToken = settings.huggingFaceApiKey;
-            if (!hfToken && process.env.HUGGING_FACE_API_KEY) {
-                hfToken = process.env.HUGGING_FACE_API_KEY;
-            }
-
-            // Clean up token
-            if (hfToken && hfToken.trim().length > 0) {
-                const token = hfToken.replace('Bearer ', '').trim();
-                if (token.startsWith('hf_')) {
-                    options.hf_token = token;
-                }
-            }
-
-            const client = await Client.connect("ByteDance/SDXL-Lightning", options);
-            
-            // Cast result to specific shape to avoid TypeScript TS7053 error
-            const result = await client.predict("/generate_image", [
-                promptText, // Text prompt
-                "4-Step"    // Steps (Lightning is fast with 4)
-            ]) as { data: any[] };
-            
-            // Gradio client returns { data: [url_or_blob, ...] }
-            if (result && result.data && result.data[0] && result.data[0].url) {
-                return result.data[0].url;
-            }
-            throw new Error("Invalid response from HF Space");
-
-        } catch (e) {
-            console.warn("HF Space failed. Waiting 1.5s before fallback to avoid rate limits...", e);
-            // CRITICAL FIX: Wait before hitting fallback to avoid "burst" detection by Pollinations
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            return getPollinationsUrl();
-        }
+        strategy = 'pollinations';
     }
 
-    // 1. Forced Strategy: Pollinations
+    // 1. Forced Strategy: Pollinations (Default)
     if (strategy === 'pollinations') {
         return getPollinationsUrl();
     }
@@ -453,12 +440,10 @@ export const geminiService = {
     // 5. Forced Strategy: Hugging Face (Direct Inference API - Paid/Limited)
     if (strategy === 'huggingface') {
         let apiKey = settings.huggingFaceApiKey?.trim();
-        // Check env var if settings are empty
         if (!apiKey && process.env.HUGGING_FACE_API_KEY) {
             apiKey = process.env.HUGGING_FACE_API_KEY;
         }
 
-        // Remove "Bearer " if user accidentally pasted it
         if (apiKey?.startsWith('Bearer ')) {
             apiKey = apiKey.replace('Bearer ', '').trim();
         }
@@ -475,9 +460,7 @@ export const geminiService = {
                 }
             );
             
-            // Handle Payment Required (402) and Unauthorized (401) by falling back to Pollinations
             if (response.status === 402 || response.status === 401) {
-                console.warn(`Hugging Face API: ${response.status} (Quota Exceeded/Unauthorized). Switching to Pollinations.`);
                 return getPollinationsUrl();
             }
 
@@ -489,12 +472,9 @@ export const geminiService = {
                     reader.onerror = reject;
                     reader.readAsDataURL(blob);
                 });
-            } else {
-                console.warn("HF Error Status:", response.status);
             }
         } catch (e) { console.warn("HF failed", e); }
         
-        // Final fallback if fetch itself failed
         return getPollinationsUrl();
     }
 

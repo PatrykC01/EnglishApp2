@@ -124,24 +124,30 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
 
   // Image Generation
   useEffect(() => {
+    let isMounted = true;
     hasAutoPlayedRef.current = false;
 
     if (currentWord && (mode === StudyMode.flashcards || mode === StudyMode.typing || mode === StudyMode.listening)) {
-        setCurrentImage(undefined);
         
         if (currentWord.imageUrl) {
-            setCurrentImage(currentWord.imageUrl);
+            if (isMounted) setCurrentImage(currentWord.imageUrl);
         } else {
+            if (isMounted) setCurrentImage(undefined);
+            
             geminiService.generateImage(currentWord.english, currentWord.exampleSentence)
                 .then(url => {
-                    setCurrentImage(url);
-                    if (onUpdateWord) {
-                        onUpdateWord({ ...currentWord, imageUrl: url });
+                    if (isMounted) {
+                        setCurrentImage(url);
+                        if (onUpdateWord) {
+                            onUpdateWord({ ...currentWord, imageUrl: url });
+                        }
                     }
                 })
                 .catch(err => console.error(err));
         }
     }
+    
+    return () => { isMounted = false; };
   }, [currentWord, mode]); 
 
   const handleRegenerateImage = () => {

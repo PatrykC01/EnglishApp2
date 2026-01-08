@@ -11,7 +11,7 @@ const DEFAULT_SETTINGS: Settings = {
   dailyGoal: 10,
   level: LanguageLevel.B1,
   aiProvider: 'free',
-  imageProvider: 'pollinations', // Changed default to Pollinations to avoid 503 errors on HF Space
+  imageProvider: 'pollinations',
   visualStyle: 'minimalist',
   aiModelType: 'flash',
   huggingFaceApiKey: '',
@@ -62,9 +62,19 @@ export const storageService = {
   getSettings: (): Settings => {
     try {
       const data = localStorage.getItem(KEYS.SETTINGS);
-      // Ensure merged settings have all required fields, specifically imageProvider
       const loadedSettings = data ? JSON.parse(data) : {};
-      return { ...DEFAULT_SETTINGS, ...loadedSettings };
+      
+      const merged = { ...DEFAULT_SETTINGS, ...loadedSettings };
+
+      // FORCE MIGRATION: If user is on the broken 'hf_space' (ByteDance/SDXL-Lightning often 503s), switch them to Pollinations
+      if (merged.imageProvider === 'hf_space') {
+          console.warn("Migrating from broken hf_space to pollinations");
+          merged.imageProvider = 'pollinations';
+          // Save immediately so we don't migrate every time
+          localStorage.setItem(KEYS.SETTINGS, JSON.stringify(merged));
+      }
+
+      return merged;
     } catch {
       return DEFAULT_SETTINGS;
     }

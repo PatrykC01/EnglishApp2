@@ -13,6 +13,7 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
   const [dragX, setDragX] = useState(0);
   const [exitX, setExitX] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [imageError, setImageError] = useState(false);
   
   // Ref to track drag value inside event closures
   const xRef = useRef(0);
@@ -24,17 +25,13 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
     xRef.current = 0;
     setExitX(null);
     setIsDragging(false);
+    setImageError(false); // Reset error state
   }, [word]);
 
   const triggerResult = (correct: boolean) => {
-      // Prevent multiple triggers
       if (exitX !== null) return;
-
-      // Animate out (Fly away)
       const flyValue = correct ? window.innerWidth : -window.innerWidth;
       setExitX(flyValue);
-      
-      // Wait for animation then call callback
       setTimeout(() => {
           onResult(correct);
       }, 300);
@@ -83,11 +80,11 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
       setIsDragging(false);
       
       if (xRef.current > 100) {
-        triggerResult(true); // Right swipe = Know
+        triggerResult(true); 
       } else if (xRef.current < -100) {
-        triggerResult(false); // Left swipe = Don't Know
+        triggerResult(false); 
       } else {
-        setDragX(0); // Snap back
+        setDragX(0); 
         xRef.current = 0;
       }
     };
@@ -98,7 +95,17 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
     document.addEventListener('mouseup', handleEnd);
   };
 
-  // Determine border color based on drag
+  // Helper to generate a nice gradient from string hash
+  const getGradient = (str: string) => {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const c1 = `hsl(${hash % 360}, 70%, 80%)`;
+      const c2 = `hsl(${(hash + 120) % 360}, 70%, 90%)`;
+      return `linear-gradient(135deg, ${c1}, ${c2})`;
+  };
+
   let borderColor = 'border-slate-200';
   const effectiveX = exitX !== null ? exitX : dragX;
   const rotate = effectiveX / 15;
@@ -107,12 +114,9 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
   if (effectiveX < -50) borderColor = 'border-red-400';
 
   return (
-    // Wrapper Layout: Flex Column to group Card and Buttons together for centering
     <div className="flex flex-col items-center w-full mx-auto outline-none focus:outline-none -mt-4 md:mt-0">
       
-      {/* CARD CONTAINER */}
       <div className="perspective-1000 w-full max-w-[80vw] md:max-w-2xl h-[50vh] min-h-[320px] md:h-[550px] relative cursor-pointer select-none z-10">
-         {/* Instruction Overlay on Drag */}
          {effectiveX > 50 && (
            <div className="absolute top-8 right-8 z-50 bg-green-500 text-white px-6 py-2 rounded-full text-lg font-bold shadow-xl animate-pulse pointer-events-none">
              ZNAM
@@ -138,8 +142,6 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
           <div className="absolute w-full h-full backface-hidden flex flex-col items-center justify-center p-4 md:p-8 rounded-3xl bg-white bg-gradient-to-br from-white to-slate-50">
             <div className="absolute top-6 text-xs md:text-base uppercase tracking-[0.2em] text-slate-400 font-semibold">{word.category}</div>
             
-            {/* Optimized text size: text-2xl on mobile base to prevent cutoff for long words */}
-            {/* Added hyphens-auto and lang="pl" for correct hyphenation */}
             <h2 className="text-2xl sm:text-4xl md:text-7xl font-bold text-slate-800 mb-8 break-words hyphens-auto max-w-full px-2 leading-tight" lang="pl">
               {word.polish}
             </h2>
@@ -153,16 +155,23 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
           {/* Back */}
           <div className="absolute w-full h-full backface-hidden rotate-y-180 flex flex-col rounded-3xl bg-white overflow-hidden shadow-inner">
             {/* Image Section */}
-            <div className="h-[50%] md:h-[55%] w-full bg-slate-100 relative group">
-               {imageUrl ? (
+            <div className="h-[50%] md:h-[55%] w-full relative group bg-slate-50">
+               {imageUrl && !imageError ? (
                   <img 
                       src={imageUrl} 
                       alt={word.english} 
                       className="w-full h-full object-cover" 
+                      onError={() => setImageError(true)}
                   />
                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-slate-300 bg-slate-50">
-                      <span className="text-4xl">🖼️</span>
+                  // Fallback: Abstract Gradient based on word hash
+                  <div 
+                      className="w-full h-full flex flex-col items-center justify-center"
+                      style={{ background: getGradient(word.english) }}
+                  >
+                      {/* Abstract Pattern Overlay */}
+                      <div className="text-6xl opacity-20 mix-blend-overlay">✨</div>
+                      {imageError && <div className="text-xs text-slate-500 mt-2 bg-white/50 px-2 py-1 rounded">Obraz niedostępny</div>}
                   </div>
                )}
                
@@ -180,7 +189,6 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
 
             {/* Text Section */}
             <div className="flex-1 flex flex-col items-center justify-center p-4 bg-white relative">
-                {/* Added hyphens-auto and lang="en" */}
                 <h2 className="text-3xl md:text-6xl font-bold text-indigo-700 mb-2 md:mb-4 break-words hyphens-auto max-w-full text-center leading-tight" lang="en">
                     {word.english}
                 </h2>
@@ -196,7 +204,7 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
         </div>
       </div>
       
-      {/* BUTTONS CONTAINER - Sibling to Card, centered together */}
+      {/* BUTTONS */}
       <div className="flex justify-between items-center mt-6 md:mt-10 px-6 md:px-20 max-w-[90vw] md:max-w-2xl w-full z-20">
         <button 
             onClick={(e) => { e.stopPropagation(); triggerResult(false); }}

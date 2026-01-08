@@ -332,14 +332,33 @@ export const geminiService = {
     };
 
     // Determine strategy based on imageProvider setting
-    let strategy = settings.imageProvider || 'hf_space'; 
+    let strategy = settings.imageProvider || 'pollinations'; // Fallback default
 
     // 0. New Strategy: Hugging Face Space (SDXL Lightning via Gradio)
     if (strategy === 'hf_space') {
         try {
             console.log("Connecting to ByteDance/SDXL-Lightning...");
-            const client = await Client.connect("ByteDance/SDXL-Lightning");
-            // Cast result to any because Gradio types are tricky with indexing
+            
+            // Pass token if present to avoid anonymous rate limits
+            const options: any = {};
+            
+            // Prioritize settings key, then environment variable
+            let hfToken = settings.huggingFaceApiKey;
+            if (!hfToken && process.env.HUGGING_FACE_API_KEY) {
+                hfToken = process.env.HUGGING_FACE_API_KEY;
+            }
+
+            // Clean up token
+            if (hfToken && hfToken.trim().length > 0) {
+                const token = hfToken.replace('Bearer ', '').trim();
+                if (token.startsWith('hf_')) {
+                    options.hf_token = token;
+                }
+            }
+
+            const client = await Client.connect("ByteDance/SDXL-Lightning", options);
+            
+            // Cast result to specific shape to avoid TypeScript TS7053 error
             const result = await client.predict("/generate_image", [
                 promptText, // Text prompt
                 "4-Step"    // Steps (Lightning is fast with 4)
@@ -352,7 +371,9 @@ export const geminiService = {
             throw new Error("Invalid response from HF Space");
 
         } catch (e) {
-            console.warn("HF Space failed, falling back to Pollinations", e);
+            console.warn("HF Space failed. Waiting 1.5s before fallback to avoid rate limits...", e);
+            // CRITICAL FIX: Wait before hitting fallback to avoid "burst" detection by Pollinations
+            await new Promise(resolve => setTimeout(resolve, 1500));
             return getPollinationsUrl();
         }
     }
@@ -432,6 +453,11 @@ export const geminiService = {
     // 5. Forced Strategy: Hugging Face (Direct Inference API - Paid/Limited)
     if (strategy === 'huggingface') {
         let apiKey = settings.huggingFaceApiKey?.trim();
+        // Check env var if settings are empty
+        if (!apiKey && process.env.HUGGING_FACE_API_KEY) {
+            apiKey = process.env.HUGGING_FACE_API_KEY;
+        }
+
         // Remove "Bearer " if user accidentally pasted it
         if (apiKey?.startsWith('Bearer ')) {
             apiKey = apiKey.replace('Bearer ', '').trim();

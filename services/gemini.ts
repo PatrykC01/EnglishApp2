@@ -7,14 +7,14 @@ const generateId = () => Math.random().toString(36).substr(2, 9);
 
 // --- QUEUE MECHANISM FOR IMAGES ---
 // Pollinations and free APIs have strict rate limits.
-// We throttle requests to 1 every 3 seconds to be safe.
+// We throttle requests to 1 every 2 seconds to be safe.
 let imageRequestQueue: Promise<any> = Promise.resolve();
 
 const queueImageRequest = <T>(operation: () => Promise<T>): Promise<T> => {
     // Chain the operation to the end of the existing queue
     const nextRequest = imageRequestQueue.then(async () => {
-        // Add a substantial polite delay (3000ms) between requests to appease rate limiters
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Add a substantial polite delay (2000ms) between requests to appease rate limiters
+        await new Promise(resolve => setTimeout(resolve, 2000));
         return operation();
     });
 
@@ -23,6 +23,21 @@ const queueImageRequest = <T>(operation: () => Promise<T>): Promise<T> => {
     
     return nextRequest;
 };
+
+// Helper: Deterministic Hash for strings
+// This ensures that the word "cat" always generates the exact same seed.
+// This allows the BROWSER to cache the image resource effectively.
+const stringToHash = (str: string): number => {
+    let hash = 0;
+    if (str.length === 0) return hash;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash |= 0; // Convert to 32bit integer
+    }
+    return Math.abs(hash);
+};
+
 // ----------------------------------
 
 // Internal Perplexity Service Implementation to avoid module resolution issues
@@ -323,10 +338,29 @@ export const geminiService = {
       } catch { return ""; }
   },
 
-  // Main Image Generation Entry Point - QUEUED
+  // Main Image Generation Entry Point - QUEUED with CACHE check
   generateImage: async (word: string, contextOrSentence?: string): Promise<string> => {
-      // Wrap the actual logic in the queue function
-      return queueImageRequest(() => geminiService._generateImageUnsafe(word, contextOrSentence));
+      // 1. Check LocalStorage Cache first
+      const cacheKey = `img_${word.toLowerCase().trim()}`;
+      try {
+          const cachedUrl = localStorage.getItem(cacheKey);
+          if (cachedUrl) {
+              console.log("Serving image from cache:", word);
+              return cachedUrl;
+          }
+      } catch (e) { console.warn("Cache read error", e); }
+
+      // 2. If not cached, queue the request
+      const url = await queueImageRequest(() => geminiService._generateImageUnsafe(word, contextOrSentence));
+      
+      // 3. Save to cache if successful
+      try {
+          if (url && url.startsWith('http')) {
+             localStorage.setItem(cacheKey, url);
+          }
+      } catch (e) { console.warn("Cache write error (quota?)", e); }
+
+      return url;
   },
 
   // Private unsafe method (actual implementation)
@@ -351,9 +385,13 @@ export const geminiService = {
         : `${word}, ${stylePrompt}`;
 
     // Helper to get Pollinations URL
-    const getPollinationsUrl = () => {
-        const seed = Math.floor(Math.random() * 100000);
-        // Using 'flux' model which is currently high quality and often less rate-limited on Pollinations
+    const getPollinationsUrl = (forceRandom: boolean = false) => {
+        // DETERMINISTIC SEEDING:
+        // Use hash of prompt to ensure the same word always produces the same URL.
+        // This leverages Browser Disk Cache to avoid hitting the API limit on repeated views.
+        const seed = forceRandom ? Math.floor(Math.random() * 1000000) : stringToHash(promptText);
+        
+        // Using 'flux' model which is currently high quality
         return `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?width=800&height=600&nologo=true&seed=${seed}&model=flux`;
     };
 

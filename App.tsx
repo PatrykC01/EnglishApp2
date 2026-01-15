@@ -21,7 +21,9 @@ const App: React.FC = () => {
   const [listFilter, setListFilter] = useState<StudySource>(StudySource.All);
   const [selectedCategory, setSelectedCategory] = useState('Losowe');
 
-  // File input ref for import
+  // Backup State
+  const [textBackupMode, setTextBackupMode] = useState<'none' | 'export' | 'import'>('none');
+  const [backupText, setBackupText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -152,7 +154,7 @@ const App: React.FC = () => {
   };
 
   // --- DATA MANAGEMENT HANDLERS ---
-  const handleExportData = () => {
+  const handleExportFile = () => {
       const data = storageService.getAllData();
       const jsonString = JSON.stringify(data, null, 2);
       const blob = new Blob([jsonString], { type: 'application/json' });
@@ -169,7 +171,7 @@ const App: React.FC = () => {
       URL.revokeObjectURL(url);
   };
 
-  const handleImportClick = () => {
+  const handleImportFileClick = () => {
       if (fileInputRef.current) {
           fileInputRef.current.click();
       }
@@ -183,28 +185,51 @@ const App: React.FC = () => {
       reader.onload = (event) => {
           try {
               const content = event.target?.result as string;
-              const data = JSON.parse(content);
-              
-              if (confirm(`Czy na pewno chcesz przywrócić kopię zapasową? Nadpisze to obecne ${words.length} słów.`)) {
-                  storageService.importData(data);
-                  
-                  // Reload state
-                  const newWords = storageService.getWords();
-                  setWords(newWords);
-                  setSettings(storageService.getSettings());
-                  updateStats(newWords);
-                  
-                  alert('Dane zostały pomyślnie zaimportowane! ✅');
-              }
+              processImport(content);
           } catch (err) {
               console.error(err);
               alert('Błąd importu: Nieprawidłowy plik kopii zapasowej.');
           } finally {
-              // Reset input so same file can be selected again if needed
               if (fileInputRef.current) fileInputRef.current.value = '';
           }
       };
       reader.readAsText(file);
+  };
+
+  const processImport = (jsonString: string) => {
+      try {
+          const data = JSON.parse(jsonString);
+          if (confirm(`Czy na pewno chcesz przywrócić kopię zapasową? Nadpisze to obecne ${words.length} słów.`)) {
+              storageService.importData(data);
+              
+              // Reload state
+              const newWords = storageService.getWords();
+              setWords(newWords);
+              setSettings(storageService.getSettings());
+              updateStats(newWords);
+              
+              setBackupText('');
+              setTextBackupMode('none');
+              alert('Dane zostały pomyślnie zaimportowane! ✅');
+          }
+      } catch (e) {
+          alert("Błąd: Nieprawidłowy format danych JSON.");
+      }
+  };
+
+  // Text Backup Handlers
+  const openTextExport = () => {
+      const data = storageService.getAllData();
+      setBackupText(JSON.stringify(data));
+      setTextBackupMode('export');
+  };
+
+  const handleCopyText = () => {
+      navigator.clipboard.writeText(backupText).then(() => {
+          alert('Skopiowano do schowka! Teraz wyślij to sobie mailem lub wklej do notatnika.');
+      }).catch(() => {
+          alert('Nie udało się skopiować automatycznie. Zaznacz tekst i skopiuj ręcznie.');
+      });
   };
 
   if (isStudying) {
@@ -387,30 +412,85 @@ const App: React.FC = () => {
               <h3 className="font-bold mb-4 text-slate-700">Zarządzanie Danymi</h3>
               <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 mb-6">
                    <p className="text-xs text-slate-500 mb-4">
-                       Przenoś swoje postępy między urządzeniami (np. z komputera na telefon).
+                       Przenoś postępy między urządzeniami. <br/>
+                       <span className="text-red-500">Uwaga:</span> Twoje słowa są zapisane tylko w tej przeglądarce.
                    </p>
-                   <div className="flex gap-3">
-                       <button 
-                           onClick={handleExportData}
-                           className="flex-1 flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 py-2 rounded-lg font-medium hover:bg-slate-50 transition-colors shadow-sm text-sm"
-                       >
-                           <span>📤</span> Eksportuj
-                       </button>
-                       <button 
-                           onClick={handleImportClick}
-                           className="flex-1 flex items-center justify-center gap-2 bg-indigo-100 text-indigo-700 border border-indigo-200 py-2 rounded-lg font-medium hover:bg-indigo-200 transition-colors shadow-sm text-sm"
-                       >
-                           <span>📥</span> Importuj
-                       </button>
-                       {/* Hidden File Input */}
-                       <input 
-                           type="file" 
-                           ref={fileInputRef} 
-                           onChange={handleFileChange} 
-                           accept=".json" 
-                           className="hidden" 
-                       />
-                   </div>
+                   
+                   {/* TEXT BACKUP MODE */}
+                   {textBackupMode !== 'none' ? (
+                       <div className="bg-white rounded-lg p-3 border border-indigo-200 shadow-sm animate-fade-in-up">
+                            <div className="flex justify-between items-center mb-2">
+                                <h4 className="font-bold text-sm text-indigo-700">
+                                    {textBackupMode === 'export' ? 'Kopiuj Dane' : 'Wklej Dane'}
+                                </h4>
+                                <button onClick={() => setTextBackupMode('none')} className="text-xs text-slate-400">Zamknij</button>
+                            </div>
+                            <textarea 
+                                className="w-full h-32 p-2 text-xs font-mono border rounded bg-slate-50 mb-2"
+                                value={backupText}
+                                onChange={(e) => setBackupText(e.target.value)}
+                                placeholder={textBackupMode === 'import' ? 'Wklej tutaj kod JSON...' : ''}
+                                readOnly={textBackupMode === 'export'}
+                                onClick={(e) => textBackupMode === 'export' && (e.target as HTMLTextAreaElement).select()}
+                            />
+                            <div className="flex gap-2">
+                                {textBackupMode === 'export' ? (
+                                    <button onClick={handleCopyText} className="flex-1 bg-indigo-600 text-white text-xs py-2 rounded font-bold">Skopiuj do schowka 📋</button>
+                                ) : (
+                                    <button onClick={() => processImport(backupText)} className="flex-1 bg-green-600 text-white text-xs py-2 rounded font-bold">Wczytaj dane 📥</button>
+                                )}
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-2 leading-tight">
+                                {textBackupMode === 'export' 
+                                    ? "Skopiuj ten tekst i wyślij go sobie (np. e-mailem, notatnik). Na nowym urządzeniu użyj opcji 'Importuj Tekst'."
+                                    : "Wklej tutaj kod wygenerowany na innym urządzeniu."}
+                            </p>
+                       </div>
+                   ) : (
+                       /* STANDARD BUTTONS */
+                       <div className="space-y-3">
+                           <div className="flex gap-3">
+                               <button 
+                                   onClick={handleExportFile}
+                                   className="flex-1 flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 py-2 rounded-lg font-medium hover:bg-slate-50 transition-colors shadow-sm text-sm"
+                               >
+                                   <span>📄</span> Zapisz Plik
+                               </button>
+                               <button 
+                                   onClick={handleImportFileClick}
+                                   className="flex-1 flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 py-2 rounded-lg font-medium hover:bg-slate-50 transition-colors shadow-sm text-sm"
+                               >
+                                   <span>📂</span> Otwórz Plik
+                               </button>
+                           </div>
+                           
+                           {/* TEXT MODE TOGGLE */}
+                           <div className="flex justify-center">
+                               <button 
+                                   onClick={openTextExport}
+                                   className="text-xs text-indigo-500 hover:text-indigo-700 font-medium underline"
+                               >
+                                   Problem z plikami? Użyj trybu tekstowego (Kopiuj/Wklej)
+                               </button>
+                               <span className="mx-2 text-slate-300">|</span>
+                               <button 
+                                   onClick={() => { setBackupText(''); setTextBackupMode('import'); }}
+                                   className="text-xs text-indigo-500 hover:text-indigo-700 font-medium underline"
+                               >
+                                   Importuj Tekst
+                               </button>
+                           </div>
+                       </div>
+                   )}
+                   
+                   {/* Hidden File Input */}
+                   <input 
+                       type="file" 
+                       ref={fileInputRef} 
+                       onChange={handleFileChange} 
+                       accept=".json" 
+                       className="hidden" 
+                   />
               </div>
 
               <h3 className="font-bold mb-4 text-slate-700">Silniki AI</h3>

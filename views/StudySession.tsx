@@ -166,7 +166,8 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
   const handleRegenerateImage = () => {
      if (!currentWord) return;
      setCurrentImage(undefined);
-     geminiService.generateImage(currentWord.english, currentWord.exampleSentence)
+     // Pass TRUE to force regeneration (bypass cache)
+     geminiService.generateImage(currentWord.english, currentWord.exampleSentence, true)
         .then(url => {
             setCurrentImage(url);
             if (onUpdateWord) {

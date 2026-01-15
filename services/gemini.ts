@@ -339,19 +339,22 @@ export const geminiService = {
   },
 
   // Main Image Generation Entry Point - QUEUED with CACHE check
-  generateImage: async (word: string, contextOrSentence?: string): Promise<string> => {
-      // 1. Check LocalStorage Cache first
+  generateImage: async (word: string, contextOrSentence?: string, forceRegenerate: boolean = false): Promise<string> => {
+      // 1. Check LocalStorage Cache first (skip if forcing)
       const cacheKey = `img_${word.toLowerCase().trim()}`;
-      try {
-          const cachedUrl = localStorage.getItem(cacheKey);
-          if (cachedUrl) {
-              console.log("Serving image from cache:", word);
-              return cachedUrl;
-          }
-      } catch (e) { console.warn("Cache read error", e); }
+      
+      if (!forceRegenerate) {
+          try {
+              const cachedUrl = localStorage.getItem(cacheKey);
+              if (cachedUrl) {
+                  console.log("Serving image from cache:", word);
+                  return cachedUrl;
+              }
+          } catch (e) { console.warn("Cache read error", e); }
+      }
 
-      // 2. If not cached, queue the request
-      const url = await queueImageRequest(() => geminiService._generateImageUnsafe(word, contextOrSentence));
+      // 2. Queue request
+      const url = await queueImageRequest(() => geminiService._generateImageUnsafe(word, contextOrSentence, forceRegenerate));
       
       // 3. Save to cache if successful
       try {
@@ -364,7 +367,7 @@ export const geminiService = {
   },
 
   // Private unsafe method (actual implementation)
-  _generateImageUnsafe: async (word: string, contextOrSentence?: string): Promise<string> => {
+  _generateImageUnsafe: async (word: string, contextOrSentence?: string, forceRegenerate: boolean = false): Promise<string> => {
     const settings: Settings = storageService.getSettings();
     const style = settings.visualStyle || 'minimalist';
 
@@ -385,11 +388,11 @@ export const geminiService = {
         : `${word}, ${stylePrompt}`;
 
     // Helper to get Pollinations URL
-    const getPollinationsUrl = (forceRandom: boolean = false) => {
+    const getPollinationsUrl = () => {
         // DETERMINISTIC SEEDING:
-        // Use hash of prompt to ensure the same word always produces the same URL.
-        // This leverages Browser Disk Cache to avoid hitting the API limit on repeated views.
-        const seed = forceRandom ? Math.floor(Math.random() * 1000000) : stringToHash(promptText);
+        // Use hash of prompt by default to ensure the same word always produces the same URL (browser caching).
+        // If forceRegenerate is true, use a random seed to bypass cache and get a new image.
+        const seed = forceRegenerate ? Math.floor(Math.random() * 1000000) : stringToHash(promptText);
         
         // Using 'flux' model which is currently high quality
         return `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?width=800&height=600&nologo=true&seed=${seed}&model=flux`;

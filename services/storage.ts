@@ -96,4 +96,38 @@ export const storageService = {
   saveStats: (stats: AppStats) => {
     localStorage.setItem(KEYS.STATS, JSON.stringify(stats));
   },
+
+  // --- Backup & Restore Features ---
+  
+  getAllData: () => {
+    return {
+      words: storageService.getWords(),
+      settings: storageService.getSettings(),
+      stats: storageService.getStats(),
+      timestamp: Date.now(),
+      version: 1
+    };
+  },
+
+  importData: (data: any) => {
+    if (!data || !Array.isArray(data.words)) {
+      throw new Error("Nieprawidłowy format pliku kopii zapasowej.");
+    }
+    
+    // Save Words
+    localStorage.setItem(KEYS.WORDS, JSON.stringify(data.words));
+    
+    // Save Settings (merge to ensure new keys exist)
+    const currentSettings = storageService.getSettings();
+    const newSettings = { ...currentSettings, ...(data.settings || {}) };
+    localStorage.setItem(KEYS.SETTINGS, JSON.stringify(newSettings));
+
+    // Save Stats
+    if (data.stats) {
+      localStorage.setItem(KEYS.STATS, JSON.stringify(data.stats));
+    }
+    
+    // Optional: Try to migrate cached images keys if we ever implement complex caching logic
+    // For now, browser cache handles the images themselves based on URLs.
+  }
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Layout from './components/Layout';
 import StudySession from './views/StudySession';
 import AddWordModal from './components/AddWordModal';
@@ -20,6 +20,9 @@ const App: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [listFilter, setListFilter] = useState<StudySource>(StudySource.All);
   const [selectedCategory, setSelectedCategory] = useState('Losowe');
+
+  // File input ref for import
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const loadedWords = storageService.getWords();
@@ -146,6 +149,62 @@ const App: React.FC = () => {
       setSettings(newS);
       storageService.saveSettings(newS);
       alert('Załadowano preset subnp.com! Pamiętaj, aby wpisać swój klucz API.');
+  };
+
+  // --- DATA MANAGEMENT HANDLERS ---
+  const handleExportData = () => {
+      const data = storageService.getAllData();
+      const jsonString = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      // Current date for filename
+      const date = new Date().toISOString().split('T')[0];
+      link.download = `ai_vocab_backup_${date}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+  };
+
+  const handleImportClick = () => {
+      if (fileInputRef.current) {
+          fileInputRef.current.click();
+      }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+          try {
+              const content = event.target?.result as string;
+              const data = JSON.parse(content);
+              
+              if (confirm(`Czy na pewno chcesz przywrócić kopię zapasową? Nadpisze to obecne ${words.length} słów.`)) {
+                  storageService.importData(data);
+                  
+                  // Reload state
+                  const newWords = storageService.getWords();
+                  setWords(newWords);
+                  setSettings(storageService.getSettings());
+                  updateStats(newWords);
+                  
+                  alert('Dane zostały pomyślnie zaimportowane! ✅');
+              }
+          } catch (err) {
+              console.error(err);
+              alert('Błąd importu: Nieprawidłowy plik kopii zapasowej.');
+          } finally {
+              // Reset input so same file can be selected again if needed
+              if (fileInputRef.current) fileInputRef.current.value = '';
+          }
+      };
+      reader.readAsText(file);
   };
 
   if (isStudying) {
@@ -323,6 +382,35 @@ const App: React.FC = () => {
                           />
                       </div>
                   </div>
+              </div>
+
+              <h3 className="font-bold mb-4 text-slate-700">Zarządzanie Danymi</h3>
+              <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 mb-6">
+                   <p className="text-xs text-slate-500 mb-4">
+                       Przenoś swoje postępy między urządzeniami (np. z komputera na telefon).
+                   </p>
+                   <div className="flex gap-3">
+                       <button 
+                           onClick={handleExportData}
+                           className="flex-1 flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 py-2 rounded-lg font-medium hover:bg-slate-50 transition-colors shadow-sm text-sm"
+                       >
+                           <span>📤</span> Eksportuj
+                       </button>
+                       <button 
+                           onClick={handleImportClick}
+                           className="flex-1 flex items-center justify-center gap-2 bg-indigo-100 text-indigo-700 border border-indigo-200 py-2 rounded-lg font-medium hover:bg-indigo-200 transition-colors shadow-sm text-sm"
+                       >
+                           <span>📥</span> Importuj
+                       </button>
+                       {/* Hidden File Input */}
+                       <input 
+                           type="file" 
+                           ref={fileInputRef} 
+                           onChange={handleFileChange} 
+                           accept=".json" 
+                           className="hidden" 
+                       />
+                   </div>
               </div>
 
               <h3 className="font-bold mb-4 text-slate-700">Silniki AI</h3>

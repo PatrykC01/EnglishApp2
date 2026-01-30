@@ -342,13 +342,27 @@ export const geminiService = {
   generateImage: async (word: string, contextOrSentence?: string, forceRegenerate: boolean = false): Promise<string> => {
       // 1. Check LocalStorage Cache first (skip if forcing)
       const cacheKey = `img_${word.toLowerCase().trim()}`;
+      const settings = storageService.getSettings();
       
       if (!forceRegenerate) {
           try {
               const cachedUrl = localStorage.getItem(cacheKey);
               if (cachedUrl) {
-                  console.log("Serving image from cache:", word);
-                  return cachedUrl;
+                  // --- SMART CACHE VALIDATION ---
+                  // If we have an API Key configured in settings, but the cached URL is "anonymous" (missing privateKey),
+                  // we consider the cache STALE and force regeneration to use the paid tier.
+                  const hasKeyConfigured = !!settings.pollinationsApiKey;
+                  const urlHasKey = cachedUrl.includes("privateKey=");
+
+                  // Only return cache if:
+                  // 1. We don't have a key configured (anonymous mode), OR
+                  // 2. We have a key, and the cached URL ALSO has a key.
+                  if (!hasKeyConfigured || (hasKeyConfigured && urlHasKey)) {
+                       console.log("Serving image from cache:", word);
+                       return cachedUrl;
+                  } else {
+                      console.log("Cache Invalidated: Upgrading to paid URL for", word);
+                  }
               }
           } catch (e) { console.warn("Cache read error", e); }
       }
@@ -397,7 +411,10 @@ export const geminiService = {
         
         // Append API Key if present
         if (settings.pollinationsApiKey) {
-             url += `&privateKey=${settings.pollinationsApiKey}`;
+             // Avoid double appending if called recursively (unlikely but safe)
+             if (!url.includes("privateKey=")) {
+                url += `&privateKey=${encodeURIComponent(settings.pollinationsApiKey)}`;
+             }
         }
         return url;
     };

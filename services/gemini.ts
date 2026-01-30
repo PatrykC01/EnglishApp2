@@ -390,12 +390,16 @@ export const geminiService = {
     // Helper to get Pollinations URL
     const getPollinationsUrl = () => {
         // DETERMINISTIC SEEDING:
-        // Use hash of prompt by default to ensure the same word always produces the same URL (browser caching).
-        // If forceRegenerate is true, use a random seed to bypass cache and get a new image.
         const seed = forceRegenerate ? Math.floor(Math.random() * 1000000) : stringToHash(promptText);
         
-        // Using 'flux' model which is currently high quality
-        return `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?width=800&height=600&nologo=true&seed=${seed}&model=flux`;
+        // Base URL
+        let url = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?width=800&height=600&nologo=true&seed=${seed}&model=flux`;
+        
+        // Append API Key if present
+        if (settings.pollinationsApiKey) {
+             url += `&privateKey=${settings.pollinationsApiKey}`;
+        }
+        return url;
     };
 
     // Determine strategy based on imageProvider setting

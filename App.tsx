@@ -545,10 +545,10 @@ const App: React.FC = () => {
                                   type="text" 
                                   value={settings.pollinationsApiKey || ''} 
                                   onChange={(e) => { const newS = { ...settings, pollinationsApiKey: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} 
-                                  placeholder="Klucz API Pollinations (np. pk_...)" 
+                                  placeholder="Wklej Private Key (dla braku limitów)" 
                                   className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm"
                               />
-                              <p className="text-[10px] text-slate-400 mt-1">Opcjonalny klucz dla wyższych limitów / pro.</p>
+                              <p className="text-[10px] text-slate-400 mt-1">Wpisz swój 'Private Key' (zaczyna się zwykle od sk_ lub jest długim ciągiem) aby pominąć kolejki.</p>
                           </div>
                       )}
                   </div>

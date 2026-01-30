@@ -53,6 +53,7 @@ export interface Settings {
   huggingFaceApiKey: string;
   deepAiApiKey: string;
   perplexityApiKey: string;
+  pollinationsApiKey?: string;
   customApiKey: string;
   customApiBase: string;
   customModelName: string;

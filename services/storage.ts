@@ -17,6 +17,7 @@ const DEFAULT_SETTINGS: Settings = {
   huggingFaceApiKey: '',
   deepAiApiKey: '',
   perplexityApiKey: '',
+  pollinationsApiKey: '',
   customApiKey: '',
   customApiBase: '',
   customModelName: '',

@@ -538,6 +538,19 @@ const App: React.FC = () => {
                           <option value="huggingface">Hugging Face (Limitowane)</option>
                       </select>
                       <p className="text-[10px] text-slate-400 mt-1">SDXL Lightning jest najszybszy i całkowicie darmowy.</p>
+                      
+                      {settings.imageProvider === 'pollinations' && (
+                          <div className="mt-2">
+                              <input 
+                                  type="text" 
+                                  value={settings.pollinationsApiKey || ''} 
+                                  onChange={(e) => { const newS = { ...settings, pollinationsApiKey: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} 
+                                  placeholder="Klucz API Pollinations (np. pk_...)" 
+                                  className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm"
+                              />
+                              <p className="text-[10px] text-slate-400 mt-1">Opcjonalny klucz dla wyższych limitów / pro.</p>
+                          </div>
+                      )}
                   </div>
 
                   {/* Visual Style Selector */}

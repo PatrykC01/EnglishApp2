@@ -1,5 +1,3 @@
-import { HfInference } from '@huggingface/inference';
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -39,28 +37,46 @@ export default async function handler(req, res) {
             return res.status(401).json({ error: 'Missing Hugging Face API Token. Add HUGGING_FACE_TOKEN to Vercel Environment Variables.' });
         }
 
-        const hf = new HfInference(token);
-
         console.log(`Generating Flux image for: ${prompt.substring(0, 50)}...`);
 
-        // Use the FLUX.1-dev model as requested
-        const imageBlob = await hf.textToImage({
-            inputs: prompt,
-            model: 'black-forest-labs/FLUX.1-dev',
-            parameters: {
-                guidance_scale: 3.5,
-                num_inference_steps: 25, // 25 is usually enough for Flux Dev and faster
-                width: 768, // Optimal size for speed/quality balance
-                height: 768,
+        // Use direct fetch to the new Router endpoint to avoid "api-inference is no longer supported" error
+        const response = await fetch(
+            "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-dev",
+            {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                    "x-use-cache": "false"
+                },
+                body: JSON.stringify({ 
+                    inputs: prompt,
+                    parameters: {
+                        guidance_scale: 3.5,
+                        num_inference_steps: 25
+                    }
+                }),
             }
-        });
+        );
 
-        // Convert Blob to Base64 Data URL for the frontend
-        const arrayBuffer = await imageBlob.arrayBuffer();
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("HF Error:", errorText);
+            
+            if (response.status === 503) {
+                 return res.status(503).json({ error: 'Model is loading (Cold Boot). Please try again in 10 seconds.' });
+            }
+            if (response.status === 429) {
+                 return res.status(429).json({ error: 'Rate limit exceeded.' });
+            }
+            return res.status(response.status).json({ error: `HF API Error: ${errorText}` });
+        }
+
+        // Convert Blob to Base64
+        const arrayBuffer = await response.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
         const base64 = buffer.toString('base64');
-        const mimeType = imageBlob.type || 'image/jpeg';
-        const dataUrl = `data:${mimeType};base64,${base64}`;
+        const dataUrl = `data:image/jpeg;base64,${base64}`;
 
         return res.status(200).json({ image: dataUrl });
     }
@@ -68,12 +84,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Unknown provider' });
 
   } catch (error) {
-    console.error("Image Gen Error:", error);
-    
-    if (error.message?.includes('rate limit') || error.status === 429) {
-        return res.status(429).json({ error: 'Hugging Face Rate Limit Reached. Spróbuj później lub użyj innego klucza.' });
-    }
-
+    console.error("Handler Error:", error);
     return res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 }

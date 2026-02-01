@@ -349,19 +349,17 @@ export const geminiService = {
               const cachedUrl = localStorage.getItem(cacheKey);
               if (cachedUrl) {
                   // --- SMART CACHE VALIDATION ---
-                  // If we have an API Key configured in settings, but the cached URL is "anonymous" (missing privateKey),
-                  // we consider the cache STALE and force regeneration to use the paid tier.
-                  const hasKeyConfigured = !!settings.pollinationsApiKey;
+                  // If we are using Pollinations and have a key, ensure cache has key.
+                  // If we are using Hugging Face (paid/token), usually we trust the cache unless it's broken.
+                  const isPollinations = settings.imageProvider === 'pollinations';
+                  const hasPollinationsKey = !!settings.pollinationsApiKey;
                   const urlHasKey = cachedUrl.includes("privateKey=");
 
-                  // Only return cache if:
-                  // 1. We don't have a key configured (anonymous mode), OR
-                  // 2. We have a key, and the cached URL ALSO has a key.
-                  if (!hasKeyConfigured || (hasKeyConfigured && urlHasKey)) {
+                  if (isPollinations && hasPollinationsKey && !urlHasKey) {
+                       console.log("Cache Invalidated: Upgrading to paid Pollinations URL");
+                  } else {
                        console.log("Serving image from cache:", word);
                        return cachedUrl;
-                  } else {
-                      console.log("Cache Invalidated: Upgrading to paid URL for", word);
                   }
               }
           } catch (e) { console.warn("Cache read error", e); }
@@ -372,7 +370,7 @@ export const geminiService = {
       
       // 3. Save to cache if successful
       try {
-          if (url && url.startsWith('http')) {
+          if (url && (url.startsWith('http') || url.startsWith('data:'))) {
              localStorage.setItem(cacheKey, url);
           }
       } catch (e) { console.warn("Cache write error (quota?)", e); }
@@ -403,38 +401,55 @@ export const geminiService = {
 
     // Helper to get Pollinations URL
     const getPollinationsUrl = () => {
-        // DETERMINISTIC SEEDING:
         const seed = forceRegenerate ? Math.floor(Math.random() * 1000000) : stringToHash(promptText);
-        
-        // Base URL
         let url = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?width=800&height=600&nologo=true&seed=${seed}&model=flux`;
-        
-        // Append API Key if present
-        if (settings.pollinationsApiKey) {
-             // Avoid double appending if called recursively (unlikely but safe)
-             if (!url.includes("privateKey=")) {
-                url += `&privateKey=${encodeURIComponent(settings.pollinationsApiKey)}`;
-             }
+        if (settings.pollinationsApiKey && !url.includes("privateKey=")) {
+            url += `&privateKey=${encodeURIComponent(settings.pollinationsApiKey)}`;
         }
         return url;
     };
 
-    // Determine strategy based on imageProvider setting
     let strategy = settings.imageProvider;
+    if (strategy === 'hf_space') strategy = 'pollinations';
 
-    // Safety fallback: if user is still on 'hf_space' (broken), force Pollinations
-    if (strategy === 'hf_space') {
-        strategy = 'pollinations';
+    // --- STRATEGY: HUGGING FACE (Flux 1.0 Dev via Backend) ---
+    if (strategy === 'huggingface') {
+        try {
+            console.log("Calling local API for HF/Flux generation...");
+            const response = await fetch('/api/generate-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: promptText,
+                    apiKey: settings.huggingFaceApiKey, // Optional: if empty, backend uses env var
+                    provider: 'huggingface'
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.image) return data.image;
+            } else {
+                const err = await response.json();
+                console.warn("HF Backend Error:", err);
+                if (response.status === 429) {
+                    throw new Error("Rate limit");
+                }
+            }
+        } catch (e) {
+            console.warn("HF Strategy failed, falling back to Pollinations", e);
+        }
+        return getPollinationsUrl();
     }
 
-    // 1. Forced Strategy: Pollinations (Default)
+    // --- STRATEGY: POLLINATIONS (Default) ---
     if (strategy === 'pollinations') {
         return getPollinationsUrl();
     }
 
-    // 2. Forced Strategy: Custom (subnp/DALL-E)
+    // --- STRATEGY: CUSTOM ---
     if (strategy === 'custom') {
-        if (!settings.customApiKey) return getPollinationsUrl(); // Fallback
+        if (!settings.customApiKey) return getPollinationsUrl();
         try {
             const baseUrl = settings.customApiBase.endsWith('/') ? settings.customApiBase.slice(0, -1) : settings.customApiBase;
             const imageModel = (settings.customModelName && settings.customModelName.toLowerCase().includes('dall-e')) 
@@ -453,12 +468,12 @@ export const geminiService = {
             }
             throw new Error("Custom Image API Error");
         } catch (e) {
-            console.warn("Custom Image failed, falling back to Pollinations", e);
+            console.warn("Custom Image failed, falling back", e);
             return getPollinationsUrl();
         }
     }
 
-    // 3. Forced Strategy: Gemini
+    // --- STRATEGY: GEMINI ---
     if (strategy === 'gemini') {
         try {
             const apiKey = process.env.API_KEY;
@@ -478,12 +493,11 @@ export const geminiService = {
             }
             throw new Error("No image data in Gemini response");
         } catch (e) {
-            console.warn("Gemini Image failed, falling back to Pollinations", e);
             return getPollinationsUrl();
         }
     }
     
-    // 4. Forced Strategy: DeepAI
+    // --- STRATEGY: DEEPAI ---
     if (strategy === 'deepai') {
         try {
             const response = await fetch('/api/generate-image', {
@@ -499,48 +513,6 @@ export const geminiService = {
         return getPollinationsUrl();
     }
     
-    // 5. Forced Strategy: Hugging Face (Direct Inference API - Paid/Limited)
-    if (strategy === 'huggingface') {
-        let apiKey = settings.huggingFaceApiKey?.trim();
-        if (!apiKey && process.env.HUGGING_FACE_API_KEY) {
-            apiKey = process.env.HUGGING_FACE_API_KEY;
-        }
-
-        if (apiKey?.startsWith('Bearer ')) {
-            apiKey = apiKey.replace('Bearer ', '').trim();
-        }
-
-        if (!apiKey) return getPollinationsUrl();
-        
-        try {
-            const response = await fetch(
-                "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0",
-                {
-                    method: "POST",
-                    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "x-use-cache": "false" },
-                    body: JSON.stringify({ inputs: promptText }),
-                }
-            );
-            
-            if (response.status === 402 || response.status === 401) {
-                return getPollinationsUrl();
-            }
-
-            if (response.ok) {
-                const blob = await response.blob();
-                return await new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result as string);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(blob);
-                });
-            }
-        } catch (e) { console.warn("HF failed", e); }
-        
-        return getPollinationsUrl();
-    }
-
-    // E. Fallback
     return getPollinationsUrl();
   },
   

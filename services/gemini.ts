@@ -210,11 +210,10 @@ export const geminiService = {
         return internalPerplexityService.generateWords(category, level, count, existingWords, settings.perplexityApiKey);
     }
 
-    const apiKey = import.meta.env.VITE_API_KEY || ''; 
+    // FIX: Cast import.meta to any to avoid TS errors
+    const apiKey = (import.meta as any).env.VITE_API_KEY || ''; 
     
     if (!apiKey) {
-        // Jeśli nie ma klucza w zmiennych, sprawdź czy użytkownik nie podał własnego w ustawieniach
-        // Ale jeśli to ma działać "out of the box", musisz mieć klucz w .env
         throw new Error("Brak klucza API. Dodaj VITE_API_KEY do zmiennych środowiskowych Vercel.");
     }
 
@@ -292,11 +291,10 @@ export const geminiService = {
           return internalPerplexityService.translateWord(inputWord, inputLang, settings.perplexityApiKey);
       }
 
-      const apiKey = import.meta.env.VITE_API_KEY || ''; 
+      // FIX: Cast import.meta to any
+      const apiKey = (import.meta as any).env.VITE_API_KEY || ''; 
     
       if (!apiKey) {
-        // Jeśli nie ma klucza w zmiennych, sprawdź czy użytkownik nie podał własnego w ustawieniach
-        // Ale jeśli to ma działać "out of the box", musisz mieć klucz w .env
         throw new Error("Brak klucza API. Dodaj VITE_API_KEY do zmiennych środowiskowych Vercel.");
       }
 
@@ -329,11 +327,10 @@ export const geminiService = {
           return internalPerplexityService.generateExampleSentence(englishWord, settings.perplexityApiKey, polishContext);
       }
 
-      const apiKey = import.meta.env.VITE_API_KEY || ''; 
+      // FIX: Cast import.meta to any
+      const apiKey = (import.meta as any).env.VITE_API_KEY || ''; 
     
       if (!apiKey) {
-        // Jeśli nie ma klucza w zmiennych, sprawdź czy użytkownik nie podał własnego w ustawieniach
-        // Ale jeśli to ma działać "out of the box", musisz mieć klucz w .env
         throw new Error("Brak klucza API. Dodaj VITE_API_KEY do zmiennych środowiskowych Vercel.");
       }
 
@@ -369,10 +366,10 @@ export const geminiService = {
                   const urlHasKey = cachedUrl.includes("privateKey=");
 
                   if (isPollinations && hasPollinationsKey && !urlHasKey) {
-                       console.log("Cache Invalidated: Upgrading to paid Pollinations URL");
+                        console.log("Cache Invalidated: Upgrading to paid Pollinations URL");
                   } else {
-                       console.log("Serving image from cache:", word);
-                       return cachedUrl;
+                        console.log("Serving image from cache:", word);
+                        return cachedUrl;
                   }
               }
           } catch (e) { console.warn("Cache read error", e); }
@@ -505,7 +502,8 @@ export const geminiService = {
     // --- STRATEGY: GEMINI ---
     if (strategy === 'gemini') {
         try {
-            const apiKey = import.meta.env.VITE_API_KEY || '';
+            // FIX: Cast import.meta to any
+            const apiKey = (import.meta as any).env.VITE_API_KEY || '';
             if (!apiKey) throw new Error("No API Key");
 
             const ai = new GoogleGenAI({ apiKey });
@@ -570,7 +568,8 @@ export const geminiService = {
          }
      }
 
-     const apiKey = import.meta.env.VITE_API_KEY || '';
+     // FIX: Cast import.meta to any
+     const apiKey = (import.meta as any).env.VITE_API_KEY || '';
      if (!apiKey) return { isCorrect: false, feedback: "AI_ERROR (No Key)" };
 
      const ai = new GoogleGenAI({ apiKey });

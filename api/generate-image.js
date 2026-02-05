@@ -81,6 +81,34 @@ export default async function handler(req, res) {
         return res.status(200).json({ image: dataUrl });
     }
 
+        // --- POLLINATIONS HANDLER (proxy -> base64) ---
+    if (provider === 'pollinations') {
+      // Pollinations URL (taki jak w frontendzie, tylko tu pobieramy binarkę)
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=600&nologo=true&seed=1&model=flux`;
+    
+      const r = await fetch(url, {
+        method: 'GET',
+        headers: {
+          // czasem pomaga na serwisach blokujących nietypowe UA
+          'User-Agent': 'Mozilla/5.0',
+          'Accept': 'image/*,*/*;q=0.8',
+        }
+      });
+    
+      if (!r.ok) {
+        const errText = await r.text().catch(() => '');
+        return res.status(r.status).json({ error: `Pollinations Error: ${errText}` });
+      }
+    
+      const arrayBuffer = await r.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const base64 = buffer.toString('base64');
+    
+      // Pollinations zwykle zwraca jpeg/png; jak nie mamy pewności, użyj jpeg
+      const dataUrl = `data:image/jpeg;base64,${base64}`;
+      return res.status(200).json({ image: dataUrl });
+    }
+
     return res.status(400).json({ error: 'Unknown provider' });
 
   } catch (error) {

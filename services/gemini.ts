@@ -442,10 +442,26 @@ export const geminiService = {
         return getPollinationsUrl();
     }
 
-    // --- STRATEGY: POLLINATIONS (Default) ---
-    if (strategy === 'pollinations') {
-        return getPollinationsUrl();
+        // --- STRATEGY: POLLINATIONS (Default) ---
+        if (strategy === 'pollinations') {
+      const response = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: promptText,
+          provider: 'pollinations'
+        })
+      });
+    
+      if (response.ok) {
+        const data = await response.json();
+        if (data.image) return data.image; // dataURL base64
+      }
+    
+      // awaryjnie: jak backend nie działa, wróć do starego URL
+      return getPollinationsUrl();
     }
+
 
     // --- STRATEGY: CUSTOM ---
     if (strategy === 'custom') {

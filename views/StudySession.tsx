@@ -143,6 +143,7 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
                 console.log("Requesting image for:", currentWord.english);
                 geminiService.generateImage(currentWord.english, currentWord.exampleSentence)
                     .then(url => {
+                        console.log("Generated image URL:", url);
                         if (isMounted) {
                             setCurrentImage(url);
                             if (onUpdateWord) {

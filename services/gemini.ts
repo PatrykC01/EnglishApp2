@@ -210,9 +210,12 @@ export const geminiService = {
         return internalPerplexityService.generateWords(category, level, count, existingWords, settings.perplexityApiKey);
     }
 
-    const apiKey = process.env.API_KEY;
+    const apiKey = import.meta.env.VITE_API_KEY || ''; 
+    
     if (!apiKey) {
-        throw new Error("Brak klucza API (API_KEY). Upewnij się, że serwer został uruchomiony z poprawnymi zmiennymi środowiskowymi.");
+        // Jeśli nie ma klucza w zmiennych, sprawdź czy użytkownik nie podał własnego w ustawieniach
+        // Ale jeśli to ma działać "out of the box", musisz mieć klucz w .env
+        throw new Error("Brak klucza API. Dodaj VITE_API_KEY do zmiennych środowiskowych Vercel.");
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -289,8 +292,13 @@ export const geminiService = {
           return internalPerplexityService.translateWord(inputWord, inputLang, settings.perplexityApiKey);
       }
 
-      const apiKey = process.env.API_KEY;
-      if (!apiKey) throw new Error("Brak klucza API w buildzie (API_KEY).");
+      const apiKey = import.meta.env.VITE_API_KEY || ''; 
+    
+      if (!apiKey) {
+        // Jeśli nie ma klucza w zmiennych, sprawdź czy użytkownik nie podał własnego w ustawieniach
+        // Ale jeśli to ma działać "out of the box", musisz mieć klucz w .env
+        throw new Error("Brak klucza API. Dodaj VITE_API_KEY do zmiennych środowiskowych Vercel.");
+      }
 
       const ai = new GoogleGenAI({ apiKey });
       const modelName = settings.aiModelType === 'pro' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
@@ -321,8 +329,13 @@ export const geminiService = {
           return internalPerplexityService.generateExampleSentence(englishWord, settings.perplexityApiKey, polishContext);
       }
 
-      const apiKey = process.env.API_KEY;
-      if (!apiKey) return "";
+      const apiKey = import.meta.env.VITE_API_KEY || ''; 
+    
+      if (!apiKey) {
+        // Jeśli nie ma klucza w zmiennych, sprawdź czy użytkownik nie podał własnego w ustawieniach
+        // Ale jeśli to ma działać "out of the box", musisz mieć klucz w .env
+        throw new Error("Brak klucza API. Dodaj VITE_API_KEY do zmiennych środowiskowych Vercel.");
+      }
 
       const ai = new GoogleGenAI({ apiKey });
       const modelName = settings.aiModelType === 'pro' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';

@@ -5,6 +5,7 @@ import AddWordModal from './components/AddWordModal';
 import { Word, Settings, AppStats, StudyMode, WordStatus, LanguageLevel, StudySource } from './types';
 import { storageService } from './services/storage';
 import { geminiService } from './services/gemini';
+import { applySrsResult } from './services/srs';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -79,31 +80,20 @@ const App: React.FC = () => {
   };
 
   const handleSessionComplete = (results: { wordId: string; correct: boolean }[]) => {
-    const updatedWords = words.map(word => {
-        const res = results.find(r => r.wordId === word.id);
-        if (res) {
-            const isCorrect = res.correct;
-            let nextReview = Date.now();
-            let status = word.status;
+  const now = Date.now();
 
-            if (isCorrect) {
-                const days = word.correct === 0 ? 1 : word.correct === 1 ? 3 : 7;
-                nextReview += days * 24 * 60 * 60 * 1000;
-                status = word.correct > 3 ? WordStatus.Learned : WordStatus.Learning;
-                return { ...word, correct: word.correct + 1, attempts: word.attempts + 1, lastReview: Date.now(), nextReview, status };
-            } else {
-                nextReview += 10 * 60 * 1000;
-                return { ...word, correct: 0, attempts: word.attempts + 1, lastReview: Date.now(), nextReview, status: WordStatus.Learning };
-            }
-        }
-        return word;
-    });
+  const updatedWords = words.map(word => {
+    const res = results.find(r => r.wordId === word.id);
+    if (!res) return word;
+    return applySrsResult(word, res.correct, now);
+  });
 
-    setWords(updatedWords);
-    storageService.saveWords(updatedWords);
-    updateStats(updatedWords);
-    setIsStudying(false);
-  };
+  setWords(updatedWords);
+  storageService.saveWords(updatedWords);
+  updateStats(updatedWords);
+  setIsStudying(false);
+};
+
 
   const handleWordUpdate = (updatedWord: Word) => {
     const newMasterList = words.map(w => w.id === updatedWord.id ? updatedWord : w);

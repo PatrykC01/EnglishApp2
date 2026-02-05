@@ -505,7 +505,7 @@ export const geminiService = {
     // --- STRATEGY: GEMINI ---
     if (strategy === 'gemini') {
         try {
-            const apiKey = process.env.API_KEY;
+            const apiKey = import.meta.env.VITE_API_KEY || '';
             if (!apiKey) throw new Error("No API Key");
 
             const ai = new GoogleGenAI({ apiKey });
@@ -570,7 +570,7 @@ export const geminiService = {
          }
      }
 
-     const apiKey = process.env.API_KEY;
+     const apiKey = import.meta.env.VITE_API_KEY || '';
      if (!apiKey) return { isCorrect: false, feedback: "AI_ERROR (No Key)" };
 
      const ai = new GoogleGenAI({ apiKey });

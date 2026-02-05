@@ -54,30 +54,40 @@ const App: React.FC = () => {
   }, [words, settings.preferredStudySource]);
 
   const startSession = (mode: StudyMode) => {
-    const now = Date.now();
-    const eligibleWords = getEligibleWords;
-    const dueWords = eligibleWords.filter(w => w.nextReview <= now || w.status === WordStatus.New)
-                          .sort((a, b) => a.nextReview - b.nextReview)
-                          .slice(0, 10);
+  const now = Date.now();
+  const eligibleWords = getEligibleWords;
 
-    if (dueWords.length === 0) {
-        const fallbackWords = eligibleWords.sort(() => 0.5 - Math.random()).slice(0, 10);
-        if (fallbackWords.length > 0) {
-             if (confirm(`Brak powtórek na dziś. Czy chcesz uruchomić tryb swobodny z losowymi słowami?`)) {
-                 setSessionWords(fallbackWords);
-                 setStudyMode(mode);
-                 setIsStudying(true);
-             }
-             return;
-        }
-        alert(`Baza słówek jest pusta lub wybrany filtr nie zwraca wyników.`);
-        return;
-    }
+  // 1) Zbierz wszystkie słowa "do nauki teraz" (due lub New)
+  const duePool = eligibleWords
+    .filter(w => w.nextReview <= now || w.status === WordStatus.New)
+    .sort((a, b) => a.nextReview - b.nextReview); // priorytet: najbardziej zaległe najpierw
 
-    setSessionWords(dueWords);
+  // 2) Jeśli coś jest do powtórki: weź np. 30 najpilniejszych i z nich wybierz 10 losowo
+  if (duePool.length > 0) {
+    const candidates = duePool.slice(0, 30);
+    const picked = candidates.sort(() => 0.5 - Math.random()).slice(0, 10);
+
+    setSessionWords(picked);
     setStudyMode(mode);
     setIsStudying(true);
-  };
+    return;
+  }
+
+  // 3) Jeśli nie ma due/new: fallback = tryb swobodny (losowe)
+  const fallbackWords = [...eligibleWords].sort(() => 0.5 - Math.random()).slice(0, 10);
+
+  if (fallbackWords.length > 0) {
+    if (confirm(`Brak powtórek na dziś. Czy chcesz uruchomić tryb swobodny z losowymi słowami?`)) {
+      setSessionWords(fallbackWords);
+      setStudyMode(mode);
+      setIsStudying(true);
+    }
+    return;
+  }
+
+  alert(`Baza słówek jest pusta lub wybrany filtr nie zwraca wyników.`);
+};
+
 
   const handleSessionComplete = (results: { wordId: string; correct: boolean }[]) => {
   const now = Date.now();

@@ -210,11 +210,9 @@ export const geminiService = {
         return internalPerplexityService.generateWords(category, level, count, existingWords, settings.perplexityApiKey);
     }
 
-    // FIX: Cast import.meta to any to avoid TS errors
-    const apiKey = (import.meta as any).env.VITE_API_KEY || ''; 
-    
+    const apiKey = process.env.API_KEY;
     if (!apiKey) {
-        throw new Error("Brak klucza API. Dodaj VITE_API_KEY do zmiennych środowiskowych Vercel.");
+        throw new Error("Brak klucza API (API_KEY). Upewnij się, że serwer został uruchomiony z poprawnymi zmiennymi środowiskowymi.");
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -291,12 +289,8 @@ export const geminiService = {
           return internalPerplexityService.translateWord(inputWord, inputLang, settings.perplexityApiKey);
       }
 
-      // FIX: Cast import.meta to any
-      const apiKey = (import.meta as any).env.VITE_API_KEY || ''; 
-    
-      if (!apiKey) {
-        throw new Error("Brak klucza API. Dodaj VITE_API_KEY do zmiennych środowiskowych Vercel.");
-      }
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) throw new Error("Brak klucza API w buildzie (API_KEY).");
 
       const ai = new GoogleGenAI({ apiKey });
       const modelName = settings.aiModelType === 'pro' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
@@ -327,12 +321,8 @@ export const geminiService = {
           return internalPerplexityService.generateExampleSentence(englishWord, settings.perplexityApiKey, polishContext);
       }
 
-      // FIX: Cast import.meta to any
-      const apiKey = (import.meta as any).env.VITE_API_KEY || ''; 
-    
-      if (!apiKey) {
-        throw new Error("Brak klucza API. Dodaj VITE_API_KEY do zmiennych środowiskowych Vercel.");
-      }
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) return "";
 
       const ai = new GoogleGenAI({ apiKey });
       const modelName = settings.aiModelType === 'pro' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
@@ -366,10 +356,10 @@ export const geminiService = {
                   const urlHasKey = cachedUrl.includes("privateKey=");
 
                   if (isPollinations && hasPollinationsKey && !urlHasKey) {
-                        console.log("Cache Invalidated: Upgrading to paid Pollinations URL");
+                       console.log("Cache Invalidated: Upgrading to paid Pollinations URL");
                   } else {
-                        console.log("Serving image from cache:", word);
-                        return cachedUrl;
+                       console.log("Serving image from cache:", word);
+                       return cachedUrl;
                   }
               }
           } catch (e) { console.warn("Cache read error", e); }
@@ -452,26 +442,10 @@ export const geminiService = {
         return getPollinationsUrl();
     }
 
-        // --- STRATEGY: POLLINATIONS (Default) ---
-        if (strategy === 'pollinations') {
-      const response = await fetch('/api/generate-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: promptText,
-          provider: 'pollinations'
-        })
-      });
-    
-      if (response.ok) {
-        const data = await response.json();
-        if (data.image) return data.image; // dataURL base64
-      }
-    
-      // awaryjnie: jak backend nie działa, wróć do starego URL
-      return getPollinationsUrl();
+    // --- STRATEGY: POLLINATIONS (Default) ---
+    if (strategy === 'pollinations') {
+        return getPollinationsUrl();
     }
-
 
     // --- STRATEGY: CUSTOM ---
     if (strategy === 'custom') {
@@ -502,8 +476,7 @@ export const geminiService = {
     // --- STRATEGY: GEMINI ---
     if (strategy === 'gemini') {
         try {
-            // FIX: Cast import.meta to any
-            const apiKey = (import.meta as any).env.VITE_API_KEY || '';
+            const apiKey = process.env.API_KEY;
             if (!apiKey) throw new Error("No API Key");
 
             const ai = new GoogleGenAI({ apiKey });
@@ -568,8 +541,7 @@ export const geminiService = {
          }
      }
 
-     // FIX: Cast import.meta to any
-     const apiKey = (import.meta as any).env.VITE_API_KEY || '';
+     const apiKey = process.env.API_KEY;
      if (!apiKey) return { isCorrect: false, feedback: "AI_ERROR (No Key)" };
 
      const ai = new GoogleGenAI({ apiKey });

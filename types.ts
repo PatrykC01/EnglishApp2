@@ -54,6 +54,7 @@ export interface Settings {
   deepAiApiKey: string;
   perplexityApiKey: string;
   pollinationsApiKey?: string;
+  pollinationsModel?: 'flux' | 'zimage' | 'klein' | 'klein-large' | 'gptimage';
   customApiKey: string;
   customApiBase: string;
   customModelName: string;

@@ -402,7 +402,11 @@ export const geminiService = {
     // Helper to get Pollinations URL
     const getPollinationsUrl = () => {
         const seed = forceRegenerate ? Math.floor(Math.random() * 1000000) : stringToHash(promptText);
-        let url = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?width=800&height=600&nologo=true&seed=${seed}&model=flux`;
+        
+        // Use 'pollinations.ai/p/' router endpoint which redirects to the active generator (often gen.pollinations.ai)
+        // This resolves the 502 Bad Gateway issues on the direct 'image.pollinations.ai' endpoint.
+        let url = `https://pollinations.ai/p/${encodeURIComponent(promptText)}?width=800&height=600&nologo=true&seed=${seed}&model=flux`;
+        
         if (settings.pollinationsApiKey && !url.includes("privateKey=")) {
             url += `&privateKey=${encodeURIComponent(settings.pollinationsApiKey)}`;
         }

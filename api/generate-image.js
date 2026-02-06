@@ -81,18 +81,6 @@ export default async function handler(req, res) {
         return res.status(200).json({ image: dataUrl });
     }
 
-        // --- POLLINATIONS HANDLER (proxy -> base64) ---
-    // --- POLLINATIONS HANDLER (Direct URL) ---
-    if (provider === 'pollinations') {
-      // Generujemy losowy seed, żeby obrazek był za każdym razem inny dla tego samego słowa
-      const seed = Math.floor(Math.random() * 10000);
-      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=600&nologo=true&seed=${seed}&model=flux`;
-      
-      // WAŻNE: Zwracamy URL, a nie Base64.
-      // To omija limit czasu Vercel (10s) i limit wielkości odpowiedzi (4.5MB).
-      return res.status(200).json({ image: url });
-    }
-
     return res.status(400).json({ error: 'Unknown provider' });
 
   } catch (error) {

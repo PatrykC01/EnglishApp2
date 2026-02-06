@@ -5,7 +5,6 @@ import AddWordModal from './components/AddWordModal';
 import { Word, Settings, AppStats, StudyMode, WordStatus, LanguageLevel, StudySource } from './types';
 import { storageService } from './services/storage';
 import { geminiService } from './services/gemini';
-import { applySrsResult } from './services/srs';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -54,56 +53,57 @@ const App: React.FC = () => {
   }, [words, settings.preferredStudySource]);
 
   const startSession = (mode: StudyMode) => {
-  const now = Date.now();
-  const eligibleWords = getEligibleWords;
+    const now = Date.now();
+    const eligibleWords = getEligibleWords;
+    const dueWords = eligibleWords.filter(w => w.nextReview <= now || w.status === WordStatus.New)
+                          .sort((a, b) => a.nextReview - b.nextReview)
+                          .slice(0, 10);
 
-  // 1) Zbierz wszystkie słowa "do nauki teraz" (due lub New)
-  const duePool = eligibleWords
-    .filter(w => w.nextReview <= now || w.status === WordStatus.New)
-    .sort((a, b) => a.nextReview - b.nextReview); // priorytet: najbardziej zaległe najpierw
+    if (dueWords.length === 0) {
+        const fallbackWords = eligibleWords.sort(() => 0.5 - Math.random()).slice(0, 10);
+        if (fallbackWords.length > 0) {
+             if (confirm(`Brak powtórek na dziś. Czy chcesz uruchomić tryb swobodny z losowymi słowami?`)) {
+                 setSessionWords(fallbackWords);
+                 setStudyMode(mode);
+                 setIsStudying(true);
+             }
+             return;
+        }
+        alert(`Baza słówek jest pusta lub wybrany filtr nie zwraca wyników.`);
+        return;
+    }
 
-  // 2) Jeśli coś jest do powtórki: weź np. 30 najpilniejszych i z nich wybierz 10 losowo
-  if (duePool.length > 0) {
-    const candidates = duePool.slice(0, 30);
-    const picked = candidates.sort(() => 0.5 - Math.random()).slice(0, 10);
-
-    setSessionWords(picked);
+    setSessionWords(dueWords);
     setStudyMode(mode);
     setIsStudying(true);
-    return;
-  }
-
-  // 3) Jeśli nie ma due/new: fallback = tryb swobodny (losowe)
-  const fallbackWords = [...eligibleWords].sort(() => 0.5 - Math.random()).slice(0, 10);
-
-  if (fallbackWords.length > 0) {
-    if (confirm(`Brak powtórek na dziś. Czy chcesz uruchomić tryb swobodny z losowymi słowami?`)) {
-      setSessionWords(fallbackWords);
-      setStudyMode(mode);
-      setIsStudying(true);
-    }
-    return;
-  }
-
-  alert(`Baza słówek jest pusta lub wybrany filtr nie zwraca wyników.`);
-};
-
+  };
 
   const handleSessionComplete = (results: { wordId: string; correct: boolean }[]) => {
-  const now = Date.now();
+    const updatedWords = words.map(word => {
+        const res = results.find(r => r.wordId === word.id);
+        if (res) {
+            const isCorrect = res.correct;
+            let nextReview = Date.now();
+            let status = word.status;
 
-  const updatedWords = words.map(word => {
-    const res = results.find(r => r.wordId === word.id);
-    if (!res) return word;
-    return applySrsResult(word, res.correct, now);
-  });
+            if (isCorrect) {
+                const days = word.correct === 0 ? 1 : word.correct === 1 ? 3 : 7;
+                nextReview += days * 24 * 60 * 60 * 1000;
+                status = word.correct > 3 ? WordStatus.Learned : WordStatus.Learning;
+                return { ...word, correct: word.correct + 1, attempts: word.attempts + 1, lastReview: Date.now(), nextReview, status };
+            } else {
+                nextReview += 10 * 60 * 1000;
+                return { ...word, correct: 0, attempts: word.attempts + 1, lastReview: Date.now(), nextReview, status: WordStatus.Learning };
+            }
+        }
+        return word;
+    });
 
-  setWords(updatedWords);
-  storageService.saveWords(updatedWords);
-  updateStats(updatedWords);
-  setIsStudying(false);
-};
-
+    setWords(updatedWords);
+    storageService.saveWords(updatedWords);
+    updateStats(updatedWords);
+    setIsStudying(false);
+  };
 
   const handleWordUpdate = (updatedWord: Word) => {
     const newMasterList = words.map(w => w.id === updatedWord.id ? updatedWord : w);

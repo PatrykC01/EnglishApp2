@@ -350,7 +350,7 @@ export const geminiService = {
                   // If we are using Hugging Face (paid/token), usually we trust the cache unless it's broken.
                   const isPollinations = settings.imageProvider === 'pollinations';
                   const hasPollinationsKey = !!settings.pollinationsApiKey;
-                  const urlHasKey = cachedUrl.includes("privateKey=");
+                  const urlHasKey = cachedUrl.includes("key=") || cachedUrl.includes("privateKey=");
 
                   if (isPollinations && hasPollinationsKey && !urlHasKey) {
                        console.log("Cache Invalidated: Upgrading to paid Pollinations URL");
@@ -392,22 +392,23 @@ export const geminiService = {
     const stylePrompt = styleMap[style] || styleMap['minimalist'];
     
     // Construct Prompt
+    // SIMPLIFIED: Removed 'context:' label to be cleaner for the model.
     const promptText = contextOrSentence 
-        ? `${word}, context: ${contextOrSentence}, ${stylePrompt}`
-        : `${word}, ${stylePrompt}`;
+        ? `${word} ${contextOrSentence} ${stylePrompt}`
+        : `${word} ${stylePrompt}`;
 
     // Helper to get Pollinations URL
     const getPollinationsUrl = () => {
         const seed = forceRegenerate ? Math.floor(Math.random() * 1000000) : stringToHash(promptText);
+        const model = settings.pollinationsModel || 'flux'; // Default to Flux
+
+        // Use 'gen.pollinations.ai/image/' as requested by user to fix 502 errors.
+        // This appears to be the direct generation cluster endpoint.
+        let url = `https://gen.pollinations.ai/image/${encodeURIComponent(promptText)}?width=1024&height=1024&seed=${seed}&model=${model}&nologo=true&enhance=false`;
         
-        // Use the official router endpoint 'pollinations.ai/p/'.
-        // This automatically redirects to an active worker (e.g. gen.pollinations.ai).
-        // This is more robust than hitting image.pollinations.ai directly which often 502s.
-        // We include nologo=true to keep it clean.
-        let url = `https://pollinations.ai/p/${encodeURIComponent(promptText)}?width=1024&height=1024&seed=${seed}&model=flux&nologo=true`;
-        
-        if (settings.pollinationsApiKey && !url.includes("privateKey=")) {
-            url += `&privateKey=${encodeURIComponent(settings.pollinationsApiKey)}`;
+        // Use 'key' parameter as requested (instead of privateKey) if available
+        if (settings.pollinationsApiKey && !url.includes("key=")) {
+            url += `&key=${encodeURIComponent(settings.pollinationsApiKey)}`;
         }
         return url;
     };

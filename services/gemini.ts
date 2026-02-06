@@ -25,8 +25,6 @@ const queueImageRequest = <T>(operation: () => Promise<T>): Promise<T> => {
 };
 
 // Helper: Deterministic Hash for strings
-// This ensures that the word "cat" always generates the exact same seed.
-// This allows the BROWSER to cache the image resource effectively.
 const stringToHash = (str: string): number => {
     let hash = 0;
     if (str.length === 0) return hash;
@@ -108,7 +106,6 @@ const internalPerplexityService = {
 
   translateWord: async (word: string, from: 'pl' | 'en', apiKey: string) => {
     const target = from === 'pl' ? 'English' : 'Polish';
-    // STRICT PROMPT: Ensure example sentence is ALWAYS in English
     const prompt = `Translate "${word}" to ${target}. Also provide one simple example sentence using the English word. 
     IMPORTANT: The 'exampleSentence' MUST be in English, even if translating to Polish.
     Return JSON: {"translation": "...", "exampleSentence": "..."}`;
@@ -403,9 +400,11 @@ export const geminiService = {
     const getPollinationsUrl = () => {
         const seed = forceRegenerate ? Math.floor(Math.random() * 1000000) : stringToHash(promptText);
         
-        // Use 'pollinations.ai/p/' router endpoint which redirects to the active generator (often gen.pollinations.ai)
-        // This resolves the 502 Bad Gateway issues on the direct 'image.pollinations.ai' endpoint.
-        let url = `https://pollinations.ai/p/${encodeURIComponent(promptText)}?width=800&height=600&nologo=true&seed=${seed}&model=flux`;
+        // Use the official router endpoint 'pollinations.ai/p/'.
+        // This automatically redirects to an active worker (e.g. gen.pollinations.ai).
+        // This is more robust than hitting image.pollinations.ai directly which often 502s.
+        // We include nologo=true to keep it clean.
+        let url = `https://pollinations.ai/p/${encodeURIComponent(promptText)}?width=1024&height=1024&seed=${seed}&model=flux&nologo=true`;
         
         if (settings.pollinationsApiKey && !url.includes("privateKey=")) {
             url += `&privateKey=${encodeURIComponent(settings.pollinationsApiKey)}`;

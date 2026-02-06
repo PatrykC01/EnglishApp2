@@ -528,7 +528,7 @@ const App: React.FC = () => {
                   
                   <div>
                       <label className="block text-sm text-slate-500 mb-1">Generator Obrazów (Fiszki)</label>
-                      <select value={settings.imageProvider || 'hf_space'} onChange={(e) => { const newS = { ...settings, imageProvider: e.target.value as any }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-white">
+                      <select value={settings.imageProvider || 'pollinations'} onChange={(e) => { const newS = { ...settings, imageProvider: e.target.value as any }; setSettings(newS); storageService.saveSettings(newS); }} className="w-full p-2 border rounded-lg bg-white">
                           <option value="huggingface">Hugging Face (Flux 1.0) 🔥</option>
                           <option value="pollinations">Pollinations AI (Backup)</option>
                           <option value="auto">Automatycznie</option>
@@ -555,15 +555,35 @@ const App: React.FC = () => {
                       )}
 
                       {settings.imageProvider === 'pollinations' && (
-                          <div className="mt-2">
-                              <input 
-                                  type="text" 
-                                  value={settings.pollinationsApiKey || ''} 
-                                  onChange={(e) => { const newS = { ...settings, pollinationsApiKey: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} 
-                                  placeholder="Wklej Private Key (dla braku limitów)" 
-                                  className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm"
-                              />
-                              <p className="text-[10px] text-slate-400 mt-1">Wpisz swój 'Private Key' (zaczyna się zwykle od sk_ lub jest długim ciągiem) aby pominąć kolejki.</p>
+                          <div className="mt-2 space-y-2">
+                              <div>
+                                  <label className="block text-xs font-bold text-slate-700 mb-1">Model Pollinations</label>
+                                  <select
+                                      value={settings.pollinationsModel || 'flux'}
+                                      onChange={(e) => { 
+                                          const newS = { ...settings, pollinationsModel: e.target.value as any }; 
+                                          setSettings(newS); 
+                                          storageService.saveSettings(newS); 
+                                      }}
+                                      className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm"
+                                  >
+                                      <option value="flux">Flux Schnell (Szybki)</option>
+                                      <option value="zimage">Z-Image Turbo (Szybki)</option>
+                                      <option value="klein">FLUX.2 Klein 4B (Wysoka jakość)</option>
+                                      <option value="klein-large">FLUX.2 Klein 9B (Najwyższa jakość)</option>
+                                      <option value="gptimage">GPT Image 1 Mini</option>
+                                  </select>
+                              </div>
+                              <div>
+                                  <input 
+                                      type="text" 
+                                      value={settings.pollinationsApiKey || ''} 
+                                      onChange={(e) => { const newS = { ...settings, pollinationsApiKey: e.target.value }; setSettings(newS); storageService.saveSettings(newS); }} 
+                                      placeholder="Wklej klucz (opcjonalny)" 
+                                      className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm"
+                                  />
+                                  <p className="text-[10px] text-slate-400 mt-1">Wpisz swój klucz API (jeśli posiadasz), aby pominąć kolejki.</p>
+                              </div>
                           </div>
                       )}
                   </div>

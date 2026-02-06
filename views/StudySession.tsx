@@ -129,12 +129,6 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
     
     // Clear previous image immediately when word changes
     setCurrentImage(undefined);
-    console.log("IMG EFFECT", {
-    mode,
-    hasWord: !!currentWord,
-    hasWordImageUrl: !!currentWord?.imageUrl,
-    english: currentWord?.english
-  });
 
     if (currentWord && (mode === StudyMode.flashcards || mode === StudyMode.typing || mode === StudyMode.listening)) {
         
@@ -149,7 +143,6 @@ const StudySession: React.FC<StudySessionProps> = ({ mode, words, onComplete, on
                 console.log("Requesting image for:", currentWord.english);
                 geminiService.generateImage(currentWord.english, currentWord.exampleSentence)
                     .then(url => {
-                        console.log("Generated image URL:", url);
                         if (isMounted) {
                             setCurrentImage(url);
                             if (onUpdateWord) {

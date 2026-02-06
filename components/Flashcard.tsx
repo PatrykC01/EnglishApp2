@@ -160,13 +160,8 @@ const Flashcard: React.FC<FlashcardProps> = ({ word, onResult, imageUrl, onRegen
                   <img 
                       src={imageUrl} 
                       alt={word.english} 
-                      className="w-full h-full object-cover md:object-contain" 
-                      onError={(e) => {
-                      console.error("IMG FAILED:", imageUrl);
-                      console.error("naturalWidth:", (e.currentTarget as HTMLImageElement).naturalWidth);
-                      setImageError(true);
-                    }}
-
+                      className="w-full h-full object-cover" 
+                      onError={() => setImageError(true)}
                   />
                ) : (
                   // Fallback: Abstract Gradient based on word hash

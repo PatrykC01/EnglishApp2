@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS: Settings = {
   deepAiApiKey: '',
   perplexityApiKey: '',
   pollinationsApiKey: '',
+  pollinationsModel: 'flux',
   customApiKey: '',
   customApiBase: '',
   customModelName: '',
